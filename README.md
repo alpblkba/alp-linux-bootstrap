@@ -9,20 +9,20 @@ the way. Internally, it is intended to grow into a profile-aware setup system
 that can support servers, desktops, terminals, devops machines, hardware labs,
 and macOS without pretending they are all the same computer.
 
-Current status: early skeleton. The first implementation is Ubuntu-first: it
-uses the Ubuntu package map and Ubuntu backend as the first working path, while
-the repository is intentionally structured to grow into a multi-distro framework.
-Other distributions, richer fallbacks, backups, profile expansion, and one-shot
-export are planned.
+Current status: early skeleton. The first implementation is Ubuntu-first with a
+conservative macOS backend. Ubuntu uses apt package maps; macOS uses Homebrew,
+zsh-native shell snippets, and small quality-of-life defaults. The repository is
+still intentionally structured to grow into a multi-distro framework. Other
+distributions, richer fallbacks, backups, profile expansion, and one-shot export
+are planned.
 
 ## Current Status
 
-The first working implementation is Ubuntu-first. It reads `packages/ubuntu.tsv`,
-selects packages by profile, creates conservative user directories, wires a
-bashrc.d loader, writes a small aliases file, and creates a temporary check
-script. The script already names planned backend families so the shape remains
-multi-distro, but only the Ubuntu backend performs real package installation in
-v0.
+The first working implementation is Ubuntu-first, and macOS now has conservative
+Homebrew support. Ubuntu reads `packages/ubuntu.tsv` and performs real apt
+installation. macOS reads `packages/macos.tsv`, requires Homebrew to already be
+installed, and performs real `brew install` for available CLI packages. The
+script already names planned backend families so the shape remains multi-distro.
 
 Package maps are early and may require distro-specific fallbacks as real Ubuntu
 versions are tested.
@@ -33,11 +33,14 @@ missing packages where Ubuntu versions differ. Tools such as `starship`,
 installers later; v0 should skip unavailable apt packages with a warning rather
 than failing the entire bootstrap transaction.
 
-On macOS and other non-Ubuntu hosts, `--dry-run` may be used to preview the
-current Ubuntu-first package plan. v0 must stop before local user configuration
-on those hosts: no bashrc changes, no aliases, no symlinks, no check script, and
-no attempt to Linuxify macOS. Real installation outside Ubuntu is intentionally
-not implemented yet.
+The macOS backend is zsh-native. It does not change the login shell, does not
+force bash as the interactive shell, does not install GUI apps or casks, does
+not override BSD tools with GNU tools by default, and does not Linuxify macOS.
+Homebrew is required but is not auto-installed.
+
+Non-Ubuntu, non-macOS hosts may use `--dry-run` to preview the current
+Ubuntu-first package plan, but v0 stops before local user configuration on those
+planned backends.
 
 ## Why This Exists
 
@@ -83,9 +86,10 @@ not-implemented message.
 
 ## Target Systems
 
-Ubuntu is the first implemented backend. The script should keep room for the
-other backend families from the beginning, but the rest of this list is still
-the planned multi-distro roadmap rather than completed support.
+Ubuntu is the first implemented backend. macOS has conservative Homebrew support.
+The script should keep room for the other backend families from the beginning,
+but the rest of this list is still the planned multi-distro roadmap rather than
+completed support.
 
 Planned support includes:
 
@@ -150,6 +154,13 @@ More complete dry-run and backup behavior will come as the repository grows.
 ## Early Usage
 
 From a checkout on Ubuntu:
+
+```bash
+./alp-linux-oneshot-bootstrap.sh --dry-run
+./alp-linux-oneshot-bootstrap.sh --profile alp-heavy
+```
+
+From a checkout on macOS:
 
 ```bash
 ./alp-linux-oneshot-bootstrap.sh --dry-run

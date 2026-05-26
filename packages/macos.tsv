@@ -1,0 +1,57 @@
+profile	logical_name	brew_package	command	notes
+core	ca-certificates	ca-certificates	ca-certificates	HTTPS trust store via Homebrew
+core	curl	curl	curl	HTTP client
+core	wget	wget	wget	Simple file fetcher
+core	git	git	git	Version control baseline
+core	gnupg	gnupg	gpg	Package signing and key management
+core	pinentry-mac	pinentry-mac	pinentry-mac	macOS pinentry helper for GPG
+core	rsync	rsync	rsync	File synchronization
+core	tree	tree	tree	Directory tree viewer
+core	jq	jq	jq	JSON processor
+core	yq	yq	yq	YAML processor
+core	shellcheck	shellcheck	shellcheck	Shell script linter
+core	shfmt	shfmt	shfmt	Shell formatter
+terminal-ux	ripgrep	ripgrep	rg	Fast recursive search
+terminal-ux	fd	fd	fd	Fast find alternative
+terminal-ux	bat	bat	bat	Cat with syntax highlighting
+terminal-ux	fzf	fzf	fzf	Fuzzy finder
+terminal-ux	zoxide	zoxide	zoxide	Smart directory jumping
+terminal-ux	direnv	direnv	direnv	Per-directory environment loader
+terminal-ux	starship	starship	starship	Cross-shell prompt
+terminal-ux	tmux	tmux	tmux	Terminal multiplexer
+terminal-ux	zellij	zellij	zellij	Terminal workspace manager
+terminal-ux	htop	htop	htop	Interactive process viewer
+terminal-ux	btop	btop	btop	Resource monitor
+dev-c	cmake	cmake	cmake	C/C++ build system
+dev-c	ninja	ninja	ninja	Fast build backend
+dev-c	meson	meson	meson	Build system
+dev-c	pkg-config	pkg-config	pkg-config	Build metadata helper
+dev-c	llvm	llvm	clang	LLVM/Clang toolchain via Homebrew; do not force PATH override by default
+dev-c	gdb	gdb	gdb	GNU debugger; macOS code-signing may be needed
+dev-c	valgrind	valgrind	valgrind	May be unavailable or limited on modern macOS
+rust	rustup-init	rustup-init	rustup-init	Rust toolchain installer via Homebrew package when available
+go	go	go	go	Go compiler/toolchain
+zig	zig	zig	zig	Zig compiler
+python	python	python3	python3	Python runtime via Homebrew
+python	pipx	pipx	pipx	Isolated Python CLI installs
+containers	colima	colima	colima	Lightweight container runtime helper for macOS
+containers	docker	docker	docker	Docker CLI only; daemon/runtime still requires Docker Desktop, Colima, or similar
+containers	docker-compose	docker-compose	docker-compose	Docker Compose plugin/binary depending on Homebrew packaging
+containers	podman	podman	podman	Podman CLI/runtime tooling
+networking	nmap	nmap	nmap	Network discovery
+networking	tcpdump	tcpdump	tcpdump	Packet capture; system tcpdump may also exist
+networking	mtr	mtr	mtr	Network path diagnostics
+networking	iperf3	iperf3	iperf3	Network performance testing
+networking	socat	socat	socat	Socket relay/debug tool
+networking	netcat	netcat	nc	Netcat implementation
+networking	bind	bind	dig	DNS tools via bind package
+networking	whois	whois	whois	WHOIS lookup
+security-lite	age	age	age	File encryption
+security-lite	pass	pass	pass	Unix password manager
+security-lite	openssh	openssh	ssh	OpenSSH via Homebrew; macOS also ships ssh
+debugging	strace	strace	strace	May be unavailable on macOS; skip if not packaged
+debugging	ltrace	ltrace	ltrace	May be unavailable on macOS; skip if not packaged
+debugging	dtrace	dtrace	dtrace	System DTrace may exist; not normally brew-installed
+embedded-lite	openocd	openocd	openocd	On-chip debugger
+embedded-lite	avrdude	avrdude	avrdude	AVR flashing tool
+embedded-lite	arm-none-eabi-gcc	arm-none-eabi-gcc	arm-none-eabi-gcc	ARM embedded GCC if packaged

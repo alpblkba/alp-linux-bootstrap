@@ -4,6 +4,7 @@ set -Eeuo pipefail
 DEFAULT_PROFILE="alp-heavy"
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 UBUNTU_TSV="$SCRIPT_DIR/packages/ubuntu.tsv"
+MACOS_TSV="$SCRIPT_DIR/packages/macos.tsv"
 CHECK_SCRIPT="/tmp/check-alp-bootstrap-tools.sh"
 PLANNED_BACKENDS="ubuntu, debian, fedora, arch, alpine, suse, rhel, centos, macos"
 
@@ -21,6 +22,8 @@ BACKEND=""
 
 SELECTED_APT_PACKAGES=()
 AVAILABLE_APT_PACKAGES=()
+SELECTED_BREW_PACKAGES=()
+AVAILABLE_BREW_PACKAGES=()
 SELECTED_COMMANDS=()
 
 log() {
@@ -47,7 +50,7 @@ Options:
   --with-java       Explicit Java opt-in placeholder; does not install Java.
   --help            Show this help.
 
-Current implementation is Ubuntu-first. Planned backend families are named, but only Ubuntu installs packages in v0.
+Current implementation is Ubuntu-first with conservative macOS Homebrew support. Other backend families are named but not implemented in v0.
 USAGE
 }
 
@@ -113,7 +116,7 @@ select_backend() {
 }
 
 require_supported_backend() {
-  if [[ "$BACKEND" == "ubuntu" ]]; then
+  if [[ "$BACKEND" == "ubuntu" || "$BACKEND" == "macos" ]]; then
     return 0
   fi
 
@@ -122,7 +125,7 @@ require_supported_backend() {
     return 0
   fi
 
-  die "backend '$BACKEND' for ${OS_NAME} ${OS_VERSION_ID} is planned but not implemented in v0; implemented backend: ubuntu; planned backends: $PLANNED_BACKENDS"
+  die "backend '$BACKEND' for ${OS_NAME} ${OS_VERSION_ID} is planned but not implemented in v0; implemented backends: ubuntu, macos; planned backends: $PLANNED_BACKENDS"
 }
 
 parse_args() {
@@ -161,6 +164,17 @@ parse_args() {
 package_profile_selected() {
   local package_profile="$1"
 
+  if [[ "$PROFILE" == "alp-heavy" && "$BACKEND" == "macos" ]]; then
+    case "$package_profile" in
+      core|terminal-ux|dev-c|rust|go|zig|python|containers|networking|security-lite|debugging|embedded-lite)
+        return 0
+        ;;
+      *)
+        return 1
+        ;;
+    esac
+  fi
+
   if [[ "$PROFILE" == "alp-heavy" ]]; then
     case "$package_profile" in
       core|server|terminal-ux|dev-c|rust|go|zig|python|containers|networking|security-lite|debugging|embedded-lite)
@@ -172,17 +186,31 @@ package_profile_selected() {
     esac
   fi
 
-  case "$package_profile" in
-    core|server|terminal-ux)
-      return 0
-      ;;
-    "$PROFILE")
-      return 0
-      ;;
-    *)
-      return 1
-      ;;
-  esac
+  if [[ "$BACKEND" == "macos" ]]; then
+    case "$package_profile" in
+      core|terminal-ux)
+        return 0
+        ;;
+      "$PROFILE")
+        return 0
+        ;;
+      *)
+        return 1
+        ;;
+    esac
+  else
+    case "$package_profile" in
+      core|server|terminal-ux)
+        return 0
+        ;;
+      "$PROFILE")
+        return 0
+        ;;
+      *)
+        return 1
+        ;;
+    esac
+  fi
 }
 
 array_contains() {
@@ -199,7 +227,7 @@ array_contains() {
   return 1
 }
 
-load_packages_from_tsv() {
+load_ubuntu_packages_from_tsv() {
   local package_profile logical_name apt_package command notes
 
   [[ -r "$UBUNTU_TSV" ]] || die "missing Ubuntu package map: $UBUNTU_TSV"
@@ -227,6 +255,53 @@ load_packages_from_tsv() {
   done < "$UBUNTU_TSV"
 
   ((${#SELECTED_APT_PACKAGES[@]} > 0)) || die "no apt packages selected for profile: $PROFILE"
+}
+
+load_macos_packages_from_tsv() {
+  local package_profile logical_name brew_package command notes
+
+  [[ -r "$MACOS_TSV" ]] || die "missing macOS package map: $MACOS_TSV"
+
+  SELECTED_BREW_PACKAGES=()
+  SELECTED_COMMANDS=()
+
+  while IFS=$'\t' read -r package_profile logical_name brew_package command notes; do
+    [[ -z "${package_profile:-}" ]] && continue
+    [[ "$package_profile" == "profile" ]] && continue
+
+    if package_profile_selected "$package_profile"; then
+      if [[ -n "${brew_package:-}" ]]; then
+        if ((${#SELECTED_BREW_PACKAGES[@]} == 0)) || ! array_contains "$brew_package" "${SELECTED_BREW_PACKAGES[@]}"; then
+          SELECTED_BREW_PACKAGES+=("$brew_package")
+        fi
+      fi
+
+      if [[ -n "${command:-}" ]]; then
+        if ((${#SELECTED_COMMANDS[@]} == 0)) || ! array_contains "$command" "${SELECTED_COMMANDS[@]}"; then
+          SELECTED_COMMANDS+=("$command")
+        fi
+      fi
+    fi
+  done < "$MACOS_TSV"
+
+  ((${#SELECTED_BREW_PACKAGES[@]} > 0)) || die "no Homebrew packages selected for profile: $PROFILE"
+}
+
+load_package_map() {
+  case "$BACKEND" in
+    ubuntu)
+      load_ubuntu_packages_from_tsv
+      ;;
+    macos)
+      load_macos_packages_from_tsv
+      ;;
+    debian|fedora|arch|alpine|suse|rhel|centos)
+      load_ubuntu_packages_from_tsv
+      ;;
+    *)
+      die "unknown backend for package loading: $BACKEND"
+      ;;
+  esac
 }
 
 filter_available_ubuntu_packages() {
@@ -266,12 +341,66 @@ install_ubuntu_packages() {
   sudo DEBIAN_FRONTEND=noninteractive apt install -y "${AVAILABLE_APT_PACKAGES[@]}"
 }
 
+ensure_homebrew() {
+  if command -v brew >/dev/null 2>&1; then
+    return 0
+  fi
+
+  if (( DRY_RUN )); then
+    log "dry-run: Homebrew is required for the macOS backend; would require brew before install"
+    return 0
+  fi
+
+  die "Homebrew is required for the macOS backend, but brew was not found; install Homebrew manually and rerun"
+}
+
+filter_available_macos_packages() {
+  local package
+
+  AVAILABLE_BREW_PACKAGES=()
+
+  log "checking Homebrew package availability"
+
+  for package in "${SELECTED_BREW_PACKAGES[@]}"; do
+    if brew info "$package" >/dev/null 2>&1; then
+      AVAILABLE_BREW_PACKAGES+=("$package")
+    else
+      warn "skipping unavailable Homebrew package: $package"
+    fi
+  done
+
+  ((${#AVAILABLE_BREW_PACKAGES[@]} > 0)) || die "no available Homebrew packages remained for profile: $PROFILE"
+}
+
+install_macos_packages() {
+  log "selected profile: $PROFILE"
+  log "selected Homebrew packages: ${SELECTED_BREW_PACKAGES[*]}"
+
+  ensure_homebrew
+
+  if (( DRY_RUN )); then
+    log "dry-run: brew update"
+    log "dry-run: check Homebrew availability for selected packages"
+    log "dry-run: brew install ${SELECTED_BREW_PACKAGES[*]}"
+    return 0
+  fi
+
+  brew update
+  filter_available_macos_packages
+
+  log "available Homebrew packages: ${AVAILABLE_BREW_PACKAGES[*]}"
+  brew install "${AVAILABLE_BREW_PACKAGES[@]}"
+}
+
 install_packages() {
   case "$BACKEND" in
     ubuntu)
       install_ubuntu_packages
       ;;
-    debian|fedora|arch|alpine|suse|rhel|centos|macos)
+    macos)
+      install_macos_packages
+      ;;
+    debian|fedora|arch|alpine|suse|rhel|centos)
       if (( DRY_RUN )); then
         log "dry-run: backend '$BACKEND' is not implemented yet; Ubuntu package map is being shown as the current v0 plan"
         log "dry-run: selected profile: $PROFILE"
@@ -290,12 +419,17 @@ install_packages() {
 setup_user_dirs() {
   local dirs=(
     "$HOME/.local/bin"
-    "$HOME/.bashrc.d"
     "$HOME/.config"
     "$HOME/workspace"
     "$HOME/repos"
     "$HOME/scratch"
   )
+
+  if [[ "$BACKEND" == "macos" ]]; then
+    dirs+=("$HOME/.zshrc.d")
+  else
+    dirs+=("$HOME/.bashrc.d")
+  fi
 
   log "creating user directories"
 
@@ -380,6 +514,89 @@ alias dfh='df -h'
 ALIASES
 }
 
+setup_zshrc_loader() {
+  local zshrc="$HOME/.zshrc"
+  local marker_begin="# >>> alp-linux-bootstrap zshrc.d loader >>>"
+  local marker_end="# <<< alp-linux-bootstrap zshrc.d loader <<<"
+
+  log "ensuring ~/.zshrc has the alp zshrc.d loader"
+
+  if [[ -f "$zshrc" ]] && grep -Fqx "$marker_begin" "$zshrc"; then
+    log "zshrc loader already present"
+    return 0
+  fi
+
+  if (( DRY_RUN )); then
+    log "dry-run: append marked zshrc.d loader block to $zshrc"
+    return 0
+  fi
+
+  {
+    printf '\n%s\n' "$marker_begin"
+    printf 'if [ -d "$HOME/.zshrc.d" ]; then\n'
+    printf '  for alp_zshrc_snippet in "$HOME"/.zshrc.d/*.zsh(N); do\n'
+    printf '    [ -r "$alp_zshrc_snippet" ] && . "$alp_zshrc_snippet"\n'
+    printf '  done\n'
+    printf '  unset alp_zshrc_snippet\n'
+    printf 'fi\n'
+    printf '%s\n' "$marker_end"
+  } >> "$zshrc"
+}
+
+setup_zsh_qol() {
+  local aliases_file="$HOME/.zshrc.d/10-alp-aliases.zsh"
+  local starship_file="$HOME/.zshrc.d/20-starship.zsh"
+
+  log "writing conservative zsh aliases"
+
+  if (( DRY_RUN )); then
+    log "dry-run: write $aliases_file"
+    log "dry-run: write $starship_file only if starship is available"
+    return 0
+  fi
+
+  cat > "$aliases_file" <<'ALIASES'
+# alp-linux-bootstrap: conservative macOS zsh aliases
+alias ll='ls -lah'
+alias la='ls -A'
+alias v='vim'
+alias gs='git status --short'
+alias ports='lsof -nP -iTCP -sTCP:LISTEN'
+alias mem='vm_stat'
+alias dfh='df -h'
+ALIASES
+
+  if command -v starship >/dev/null 2>&1; then
+    cat > "$starship_file" <<'STARSHIP'
+# alp-linux-bootstrap: optional starship init for zsh
+eval "$(starship init zsh)"
+STARSHIP
+  fi
+}
+
+apply_macos_defaults() {
+  log "applying conservative macOS defaults"
+
+  if (( DRY_RUN )); then
+    log "dry-run: defaults write com.apple.finder ShowPathbar -bool true"
+    log "dry-run: defaults write com.apple.finder ShowStatusBar -bool true"
+    log "dry-run: mkdir -p $HOME/Screenshots"
+    log "dry-run: defaults write com.apple.screencapture location $HOME/Screenshots"
+    log "dry-run: defaults write NSGlobalDomain InitialKeyRepeat -int 20"
+    log "dry-run: defaults write NSGlobalDomain KeyRepeat -int 3"
+    log "dry-run: Finder restart may be needed later; v0 does not force kill Finder"
+    return 0
+  fi
+
+  defaults write com.apple.finder ShowPathbar -bool true
+  defaults write com.apple.finder ShowStatusBar -bool true
+  mkdir -p "$HOME/Screenshots"
+  defaults write com.apple.screencapture location "$HOME/Screenshots"
+  defaults write NSGlobalDomain InitialKeyRepeat -int 20
+  defaults write NSGlobalDomain KeyRepeat -int 3
+  warn "Finder restart may be needed for Finder defaults to appear; v0 does not force kill Finder"
+}
+
 write_check_script() {
   local command
 
@@ -424,12 +641,23 @@ main() {
     log "Java/JVM tooling excluded by default"
   fi
 
-  load_packages_from_tsv
+  load_package_map
   install_packages
   setup_user_dirs
-  setup_ubuntu_compat_symlinks
-  setup_bashrc_loader
-  setup_bash_qol
+
+  case "$BACKEND" in
+    ubuntu)
+      setup_ubuntu_compat_symlinks
+      setup_bashrc_loader
+      setup_bash_qol
+      ;;
+    macos)
+      setup_zshrc_loader
+      setup_zsh_qol
+      apply_macos_defaults
+      ;;
+  esac
+
   write_check_script
 
   log "done"
