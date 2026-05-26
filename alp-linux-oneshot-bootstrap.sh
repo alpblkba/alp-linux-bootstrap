@@ -5,6 +5,7 @@ DEFAULT_PROFILE="alp-heavy"
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 UBUNTU_TSV="$SCRIPT_DIR/packages/ubuntu.tsv"
 CHECK_SCRIPT="/tmp/check-alp-bootstrap-tools.sh"
+PLANNED_BACKENDS="ubuntu, debian, fedora, arch, alpine, suse, rhel, centos, macos"
 
 DRY_RUN=0
 PROFILE="$DEFAULT_PROFILE"
@@ -46,7 +47,7 @@ Options:
   --with-java       Explicit Java opt-in placeholder; does not install Java.
   --help            Show this help.
 
-Current implementation is Ubuntu-first. Multi-distro backend stubs exist, but only Ubuntu installs packages in v0.
+Current implementation is Ubuntu-first. Planned backend families are named, but only Ubuntu installs packages in v0.
 USAGE
 }
 
@@ -121,7 +122,7 @@ require_supported_backend() {
     return 0
   fi
 
-  die "backend '$BACKEND' for ${OS_NAME} ${OS_VERSION_ID} is planned but not implemented in v0; implemented backend: ubuntu"
+  die "backend '$BACKEND' for ${OS_NAME} ${OS_VERSION_ID} is planned but not implemented in v0; implemented backend: ubuntu; planned backends: $PLANNED_BACKENDS"
 }
 
 parse_args() {
@@ -278,10 +279,10 @@ install_packages() {
         log "dry-run: stopping before local Ubuntu-specific user configuration actions on non-Ubuntu host"
         exit 0
       fi
-      die "backend '$BACKEND' is planned but not implemented yet"
+      die "backend '$BACKEND' is planned but not implemented yet; planned backends: $PLANNED_BACKENDS"
       ;;
     *)
-      die "unknown backend for ${OS_NAME} ${OS_VERSION_ID}"
+      die "unknown backend for ${OS_NAME} ${OS_VERSION_ID}; planned backends: $PLANNED_BACKENDS"
       ;;
   esac
 }

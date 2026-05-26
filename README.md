@@ -33,6 +33,12 @@ missing packages where Ubuntu versions differ. Tools such as `starship`,
 installers later; v0 should skip unavailable apt packages with a warning rather
 than failing the entire bootstrap transaction.
 
+On macOS and other non-Ubuntu hosts, `--dry-run` may be used to preview the
+current Ubuntu-first package plan. v0 must stop before local user configuration
+on those hosts: no bashrc changes, no aliases, no symlinks, no check script, and
+no attempt to Linuxify macOS. Real installation outside Ubuntu is intentionally
+not implemented yet.
+
 ## Why This Exists
 
 Most bootstrap projects drift toward one of two extremes: blind dotfiles copying
