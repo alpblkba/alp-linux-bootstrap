@@ -106,14 +106,14 @@ Profiles currently used or planned:
 
 Profile behavior is still simple and based on TSV package rows.
 
-## Java Stance
+## Java stance
 
 Java is not installed by default.
 
 Do not add Maven, Gradle, Spring, Kotlin, Selenium, or JVM-centered tooling to
 default package maps. Java support should stay explicit opt-in work later.
 
-## macOS Notes
+## macOS notes
 
 macOS uses Homebrew. Homebrew is required but not auto-installed.
 
@@ -135,7 +135,7 @@ The macOS defaults are intentionally small:
 - set screenshots to `~/Screenshots`
 - set conservative keyboard repeat values
 
-## Safety Notes
+## Safety notes
 
 - Use `--dry-run` first.
 - No silent destructive config overwrite is intended.
@@ -147,13 +147,10 @@ The macOS defaults are intentionally small:
 
 Backups and stronger dry-run coverage are still future work.
 
-## Repository Layout
+## Repository layout
 
 - `README.md` - practical entry notes.
 - `alp-linux-oneshot-bootstrap.sh` - current bootstrap script.
 - `packages/ubuntu.tsv` - Ubuntu apt package map.
 - `packages/macos.tsv` - macOS Homebrew package map.
 - `docs/guru-survey.md` - survey notes used to shape early decisions.
-- `tracelog/` - engineering decision history.
-
-The deeper reasoning lives in `tracelog/`; the README is meant to stay boring.
