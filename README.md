@@ -4,7 +4,7 @@ This is my own bootstrap repository for setting up Linux and macOS machines.
 
 It installs packages, creates a small directory layout, adds conservative shell
 helpers, and keeps package lists split by platform. The current working backends
-are Ubuntu, Fedora, Arch, and macOS. Other distributions are planned but not
+are Ubuntu, Fedora, Arch, RHEL, and macOS. Other distributions are planned but not
 implemented yet.
 
 It is a setup script that should stay readable enough to review, edit, and run
@@ -16,6 +16,7 @@ again.
   symlinks for tools such as `fd` and `bat`.
 - Fedora backend: dnf package install and bash setup.
 - Arch backend: pacman package install and bash setup.
+- RHEL backend: dnf package install and bash setup.
 - macOS backend: Homebrew package install, zsh setup, and conservative macOS
   defaults.
 - Other backends: named/planned stubs only.
@@ -24,9 +25,9 @@ again.
 The project is still early. Review the script and package maps before running a
 real install.
 
-Package maps are also early. Some apt, dnf, pacman, and Homebrew packages may be
-unavailable on a given OS version; the script filters unavailable packages before
-real installs where practical.
+Package maps are also early. Some apt, dnf, pacman, and Homebrew packages may
+be unavailable on a given OS version or enabled repository set; the script
+filters unavailable packages before real installs where practical.
 
 ## Usage
 
@@ -58,6 +59,13 @@ Arch:
 ./alp-linux-oneshot-bootstrap.sh --profile alp-heavy
 ```
 
+RHEL:
+
+```bash
+./alp-linux-oneshot-bootstrap.sh --dry-run
+./alp-linux-oneshot-bootstrap.sh --profile alp-heavy
+```
+
 Useful flags:
 
 - `--dry-run` - print what would happen.
@@ -74,6 +82,7 @@ Implemented now:
 - Ubuntu: real apt install path.
 - Fedora: real dnf install path.
 - Arch: real pacman install path using official repositories only.
+- RHEL: real dnf install path for RHEL-style repositories.
 - macOS: real Homebrew install path, assuming Homebrew is already installed.
 
 Backends are currently family-based, not version-specific.
@@ -81,11 +90,13 @@ Backends are currently family-based, not version-specific.
 Arch support does not include AUR helpers. No `yay`, `paru`, or AUR packages are
 installed in v0.
 
+RHEL support is repository-dependent. The script does not register RHEL systems,
+run `subscription-manager`, or enable EPEL in v0.
+
 Planned backend families:
 
 - Debian
 - Alpine
-- RHEL
 - CentOS
 - openSUSE/SUSE
 
@@ -191,4 +202,5 @@ Backups and stronger dry-run coverage are still future work.
 - `packages/ubuntu.tsv` - Ubuntu apt package map.
 - `packages/fedora.tsv` - Fedora dnf package map.
 - `packages/arch.tsv` - Arch pacman package map.
+- `packages/rhel.tsv` - RHEL dnf package map.
 - `packages/macos.tsv` - macOS Homebrew package map.

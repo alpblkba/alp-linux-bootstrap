@@ -7,6 +7,7 @@ UBUNTU_TSV="$SCRIPT_DIR/packages/ubuntu.tsv"
 MACOS_TSV="$SCRIPT_DIR/packages/macos.tsv"
 FEDORA_TSV="$SCRIPT_DIR/packages/fedora.tsv"
 ARCH_TSV="$SCRIPT_DIR/packages/arch.tsv"
+RHEL_TSV="$SCRIPT_DIR/packages/rhel.tsv"
 CHECK_SCRIPT="/tmp/check-alp-bootstrap-tools.sh"
 PLANNED_BACKENDS="ubuntu, debian, fedora, arch, alpine, suse, rhel, centos, macos"
 
@@ -31,6 +32,8 @@ SELECTED_DNF_PACKAGES=()
 AVAILABLE_DNF_PACKAGES=()
 SELECTED_PACMAN_PACKAGES=()
 AVAILABLE_PACMAN_PACKAGES=()
+SELECTED_RHEL_DNF_PACKAGES=()
+AVAILABLE_RHEL_DNF_PACKAGES=()
 SELECTED_COMMANDS=()
 
 log() {
@@ -58,7 +61,7 @@ Options:
   --with-java       Deprecated alias for --add-java; does not install Java.
   --help            Show this help.
 
-Current implementation has Ubuntu, Fedora, Arch, and conservative macOS backends. Other backend families are named but not implemented in v0.
+Current implementation has Ubuntu, Fedora, Arch, RHEL, and conservative macOS backends. Other backend families are named but not implemented in v0.
 USAGE
 }
 
@@ -124,7 +127,7 @@ select_backend() {
 }
 
 require_supported_backend() {
-  if [[ "$BACKEND" == "ubuntu" || "$BACKEND" == "fedora" || "$BACKEND" == "arch" || "$BACKEND" == "macos" ]]; then
+  if [[ "$BACKEND" == "ubuntu" || "$BACKEND" == "fedora" || "$BACKEND" == "arch" || "$BACKEND" == "rhel" || "$BACKEND" == "macos" ]]; then
     return 0
   fi
 
@@ -133,7 +136,7 @@ require_supported_backend() {
     return 0
   fi
 
-  die "backend '$BACKEND' for ${OS_NAME} ${OS_VERSION_ID} is planned but not implemented in v0; implemented backends: ubuntu, fedora, arch, macos; planned backends: $PLANNED_BACKENDS"
+  die "backend '$BACKEND' for ${OS_NAME} ${OS_VERSION_ID} is planned but not implemented in v0; implemented backends: ubuntu, fedora, arch, rhel, macos; planned backends: $PLANNED_BACKENDS"
 }
 
 parse_args() {
@@ -363,6 +366,36 @@ load_arch_packages_from_tsv() {
   ((${#SELECTED_PACMAN_PACKAGES[@]} > 0)) || die "no pacman packages selected for profile: $PROFILE"
 }
 
+load_rhel_packages_from_tsv() {
+  local package_profile logical_name dnf_package command notes
+
+  [[ -r "$RHEL_TSV" ]] || die "missing RHEL package map: $RHEL_TSV"
+
+  SELECTED_RHEL_DNF_PACKAGES=()
+  SELECTED_COMMANDS=()
+
+  while IFS=$'\t' read -r package_profile logical_name dnf_package command notes; do
+    [[ -z "${package_profile:-}" ]] && continue
+    [[ "$package_profile" == "profile" ]] && continue
+
+    if package_profile_selected "$package_profile"; then
+      if [[ -n "${dnf_package:-}" ]]; then
+        if ((${#SELECTED_RHEL_DNF_PACKAGES[@]} == 0)) || ! array_contains "$dnf_package" "${SELECTED_RHEL_DNF_PACKAGES[@]}"; then
+          SELECTED_RHEL_DNF_PACKAGES+=("$dnf_package")
+        fi
+      fi
+
+      if [[ -n "${command:-}" ]]; then
+        if ((${#SELECTED_COMMANDS[@]} == 0)) || ! array_contains "$command" "${SELECTED_COMMANDS[@]}"; then
+          SELECTED_COMMANDS+=("$command")
+        fi
+      fi
+    fi
+  done < "$RHEL_TSV"
+
+  ((${#SELECTED_RHEL_DNF_PACKAGES[@]} > 0)) || die "no RHEL dnf packages selected for profile: $PROFILE"
+}
+
 load_package_map() {
   case "$BACKEND" in
     ubuntu)
@@ -377,7 +410,10 @@ load_package_map() {
     arch)
       load_arch_packages_from_tsv
       ;;
-    debian|alpine|suse|rhel|centos)
+    rhel)
+      load_rhel_packages_from_tsv
+      ;;
+    debian|alpine|suse|centos)
       load_ubuntu_packages_from_tsv
       ;;
     *)
@@ -479,7 +515,7 @@ ensure_dnf() {
     return 0
   fi
 
-  die "dnf is required for the Fedora backend, but dnf was not found"
+  die "dnf is required for this backend, but dnf was not found"
 }
 
 dnf_package_available() {
@@ -531,6 +567,43 @@ install_fedora_packages() {
 
   log "available dnf packages: ${AVAILABLE_DNF_PACKAGES[*]}"
   sudo dnf install -y "${AVAILABLE_DNF_PACKAGES[@]}"
+}
+
+filter_available_rhel_packages() {
+  local package
+
+  AVAILABLE_RHEL_DNF_PACKAGES=()
+
+  log "checking RHEL package availability"
+
+  for package in "${SELECTED_RHEL_DNF_PACKAGES[@]}"; do
+    if dnf_package_available "$package"; then
+      AVAILABLE_RHEL_DNF_PACKAGES+=("$package")
+    else
+      warn "skipping unavailable RHEL dnf package: $package"
+    fi
+  done
+
+  ((${#AVAILABLE_RHEL_DNF_PACKAGES[@]} > 0)) || die "no available RHEL dnf packages remained for profile: $PROFILE"
+}
+
+install_rhel_packages() {
+  log "selected profile: $PROFILE"
+  log "selected RHEL dnf packages: ${SELECTED_RHEL_DNF_PACKAGES[*]}"
+
+  if (( DRY_RUN )); then
+    log "dry-run: sudo dnf makecache"
+    log "dry-run: check RHEL dnf availability for selected packages"
+    log "dry-run: sudo dnf install -y ${SELECTED_RHEL_DNF_PACKAGES[*]}"
+    return 0
+  fi
+
+  ensure_dnf
+  sudo dnf makecache
+  filter_available_rhel_packages
+
+  log "available RHEL dnf packages: ${AVAILABLE_RHEL_DNF_PACKAGES[*]}"
+  sudo dnf install -y "${AVAILABLE_RHEL_DNF_PACKAGES[@]}"
 }
 
 ensure_pacman() {
@@ -592,7 +665,10 @@ install_packages() {
     arch)
       install_arch_packages
       ;;
-    debian|alpine|suse|rhel|centos)
+    rhel)
+      install_rhel_packages
+      ;;
+    debian|alpine|suse|centos)
       if (( DRY_RUN )); then
         log "dry-run: backend '$BACKEND' is not implemented yet; Ubuntu package map is being shown as the current v0 plan"
         log "dry-run: selected profile: $PROFILE"
@@ -851,6 +927,10 @@ main() {
       setup_bash_qol
       ;;
     arch)
+      setup_bashrc_loader
+      setup_bash_qol
+      ;;
+    rhel)
       setup_bashrc_loader
       setup_bash_qol
       ;;

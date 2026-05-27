@@ -1,0 +1,86 @@
+profile	logical_name	dnf_package	command	notes
+core	ca-certificates	ca-certificates	ca-certificates	HTTPS trust store placeholder; no normal interactive command
+core	curl	curl	curl	HTTP client
+core	wget	wget	wget	Simple file fetcher
+core	git	git	git	Version control baseline
+core	gnupg	gnupg2	gpg	Package signing and key management
+core	redhat-lsb-core	redhat-lsb-core	lsb_release	Distribution metadata helper when available
+core	unzip	unzip	unzip	Archive extraction
+core	zip	zip	zip	Archive creation
+core	tar	tar	tar	Archive handling
+core	rsync	rsync	rsync	File synchronization
+core	openssh-clients	openssh-clients	ssh	SSH client
+core	htop	htop	htop	Interactive process viewer when available
+core	tmux	tmux	tmux	Terminal multiplexer
+core	tree	tree	tree	Directory tree viewer
+core	jq	jq	jq	JSON processor
+core	yq	yq	yq	YAML processor when available
+core	ShellCheck	ShellCheck	shellcheck	Shell script linter when available
+core	shfmt	shfmt	shfmt	Shell formatter when available
+server	openssh-server	openssh-server	sshd	SSH server
+server	vim-enhanced	vim-enhanced	vim	Terminal editor
+server	acl	acl	getfacl	POSIX ACL tooling
+server	logrotate	logrotate	logrotate	Log rotation
+server	lsof	lsof	lsof	Open files/process inspection
+terminal-ux	ripgrep	ripgrep	rg	Fast recursive search when available
+terminal-ux	fd-find	fd-find	fd	Fast find alternative when available
+terminal-ux	bat	bat	bat	Cat with syntax highlighting when available
+terminal-ux	fzf	fzf	fzf	Fuzzy finder when available
+terminal-ux	zoxide	zoxide	zoxide	Smart directory jumping when available
+terminal-ux	direnv	direnv	direnv	Per-directory environment loader when available
+terminal-ux	starship	starship	starship	Cross-shell prompt when available
+terminal-ux	zellij	zellij	zellij	Terminal workspace manager when available
+terminal-ux	btop	btop	btop	Resource monitor when available
+dev-c	gcc	gcc	gcc	C compiler
+dev-c	gcc-c++	gcc-c++	g++	C++ compiler
+dev-c	make	make	make	Build baseline
+dev-c	cmake	cmake	cmake	C/C++ build system
+dev-c	ninja-build	ninja-build	ninja	Fast build backend when available
+dev-c	meson	meson	meson	Build system when available
+dev-c	pkgconf-pkg-config	pkgconf-pkg-config	pkg-config	Build metadata helper
+dev-c	gdb	gdb	gdb	GNU debugger
+dev-c	lldb	lldb	lldb	LLVM debugger when available
+dev-c	clang	clang	clang	LLVM C/C++ compiler when available
+dev-c	clang-tools-extra	clang-tools-extra	clang-format	Clang extra tools and formatter when available
+dev-c	valgrind	valgrind	valgrind	Memory debugging
+rust	rust-toolset	rust-toolset	rustc	Rust toolset when available
+rust	cargo	cargo	cargo	Rust package manager when available
+rust	rust	rust	rustc	Rust compiler when available
+rust	rustup	rustup	rustup	Rust toolchain installer when packaged
+go	golang	golang	go	Go compiler/toolchain
+zig	zig	zig	zig	Zig compiler when available
+python	python3	python3	python3	Python runtime
+python	python3-pip	python3-pip	pip3	Python package installer
+python	python3-virtualenv	python3-virtualenv	virtualenv	Python virtualenv helper when available
+python	pipx	pipx	pipx	Isolated Python CLI installs when available
+containers	podman	podman	podman	Rootless container engine
+containers	buildah	buildah	buildah	OCI image builder
+containers	skopeo	skopeo	skopeo	Container image copy/inspect
+containers	docker-cli	docker-cli	docker	Docker CLI when available
+containers	docker-compose-plugin	docker-compose-plugin	docker	Compose plugin when available
+networking	bind-utils	bind-utils	dig	DNS query tools
+networking	net-tools	net-tools	netstat	Legacy network tools
+networking	iproute	iproute	ip	Modern network tools
+networking	traceroute	traceroute	traceroute	Route tracing
+networking	mtr	mtr	mtr	Network path diagnostics
+networking	nmap	nmap	nmap	Network discovery
+networking	tcpdump	tcpdump	tcpdump	Packet capture
+networking	whois	whois	whois	WHOIS lookup when available
+networking	socat	socat	socat	Socket relay/debug tool
+networking	nmap-ncat	nmap-ncat	nc	Netcat implementation
+networking	iperf3	iperf3	iperf3	Network performance testing
+security-lite	firewalld	firewalld	firewall-cmd	RHEL firewall management
+security-lite	fail2ban	fail2ban	fail2ban-client	Basic brute-force protection when available
+security-lite	age	age	age	File encryption when available
+security-lite	pass	pass	pass	Unix password manager when available
+security-lite	openssh-clients	openssh-clients	ssh	SSH client security baseline
+debugging	strace	strace	strace	System call tracer
+debugging	ltrace	ltrace	ltrace	Library call tracer when available
+debugging	perf	perf	perf	Performance tooling when available
+debugging	bpftrace	bpftrace	bpftrace	eBPF tracing when available
+debugging	sysstat	sysstat	iostat	System performance stats
+debugging	lsof	lsof	lsof	Open files/process inspection
+embedded-lite	avrdude	avrdude	avrdude	AVR flashing tool when available
+embedded-lite	openocd	openocd	openocd	On-chip debugger when available
+embedded-lite	arm-none-eabi-gcc	arm-none-eabi-gcc	arm-none-eabi-gcc	ARM embedded GCC when available
+embedded-lite	gdb-gdbserver	gdb-gdbserver	gdbserver	GDB server tooling when available
