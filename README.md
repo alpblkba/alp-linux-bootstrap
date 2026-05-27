@@ -4,8 +4,8 @@ This is my own bootstrap repository for setting up Linux and macOS machines.
 
 It installs packages, creates a small directory layout, adds conservative shell
 helpers, and keeps package lists split by platform. The current working backends
-are Ubuntu, Fedora, Arch, RHEL, and macOS. Other distributions are planned but not
-implemented yet.
+are Ubuntu, Debian, Fedora, Arch, RHEL, and macOS. Other distributions are
+planned but not implemented yet.
 
 It is a setup script that should stay readable enough to review, edit, and run
 again.
@@ -14,6 +14,8 @@ again.
 
 - Ubuntu backend: apt package install, bash setup, and Ubuntu compatibility
   symlinks for tools such as `fd` and `bat`.
+- Debian backend: apt package install, bash setup, and Debian-family
+  compatibility symlinks for tools such as `fd` and `bat`.
 - Fedora backend: dnf package install and bash setup.
 - Arch backend: pacman package install and bash setup.
 - RHEL backend: dnf package install and bash setup.
@@ -32,6 +34,13 @@ filters unavailable packages before real installs where practical.
 ## Usage
 
 Ubuntu:
+
+```bash
+./alp-linux-oneshot-bootstrap.sh --dry-run
+./alp-linux-oneshot-bootstrap.sh --profile alp-heavy
+```
+
+Debian:
 
 ```bash
 ./alp-linux-oneshot-bootstrap.sh --dry-run
@@ -80,12 +89,17 @@ Useful flags:
 Implemented now:
 
 - Ubuntu: real apt install path.
+- Debian: real apt install path.
 - Fedora: real dnf install path.
 - Arch: real pacman install path using official repositories only.
 - RHEL: real dnf install path for RHEL-style repositories.
 - macOS: real Homebrew install path, assuming Homebrew is already installed.
 
 Backends are currently family-based, not version-specific.
+
+Debian and Ubuntu both use apt, but they have separate package maps.
+Debian-family systems use compatibility symlinks for `fd` and `bat` command
+names where needed.
 
 Arch support does not include AUR helpers. No `yay`, `paru`, or AUR packages are
 installed in v0.
@@ -95,7 +109,6 @@ run `subscription-manager`, or enable EPEL in v0.
 
 Planned backend families:
 
-- Debian
 - Alpine
 - CentOS
 - openSUSE/SUSE
@@ -200,6 +213,7 @@ Backups and stronger dry-run coverage are still future work.
 - `README.md` - practical entry notes.
 - `alp-linux-oneshot-bootstrap.sh` - current bootstrap script.
 - `packages/ubuntu.tsv` - Ubuntu apt package map.
+- `packages/debian.tsv` - Debian apt package map.
 - `packages/fedora.tsv` - Fedora dnf package map.
 - `packages/arch.tsv` - Arch pacman package map.
 - `packages/rhel.tsv` - RHEL dnf package map.

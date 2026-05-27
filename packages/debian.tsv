@@ -1,0 +1,87 @@
+profile	logical_name	apt_package	command	notes
+core	ca-certificates	ca-certificates	ca-certificates	HTTPS trust store placeholder; no normal interactive command
+core	curl	curl	curl	HTTP client
+core	wget	wget	wget	Simple file fetcher
+core	git	git	git	Version control baseline
+core	gnupg	gnupg	gpg	Package signing and key management
+core	lsb-release	lsb-release	lsb_release	Distribution metadata helper
+core	software-properties-common	software-properties-common	add-apt-repository	APT repository helper when available
+core	unzip	unzip	unzip	Archive extraction
+core	zip	zip	zip	Archive creation
+core	tar	tar	tar	Archive handling
+core	rsync	rsync	rsync	File synchronization
+core	openssh-client	openssh-client	ssh	SSH client
+core	htop	htop	htop	Interactive process viewer
+core	tmux	tmux	tmux	Terminal multiplexer
+core	tree	tree	tree	Directory tree viewer
+core	jq	jq	jq	JSON processor
+core	yq	yq	yq	YAML processor when packaged
+core	shellcheck	shellcheck	shellcheck	Shell script linter
+core	shfmt	shfmt	shfmt	Shell formatter when packaged
+server	openssh-server	openssh-server	sshd	SSH server
+server	vim	vim	vim	Terminal editor
+server	acl	acl	getfacl	POSIX ACL tooling
+server	logrotate	logrotate	logrotate	Log rotation
+server	needrestart	needrestart	needrestart	Service restart hints after upgrades when packaged
+server	lsof	lsof	lsof	Open files/process inspection
+terminal-ux	ripgrep	ripgrep	rg	Fast recursive search
+terminal-ux	fd-find	fd-find	fdfind	Fast find alternative; symlinked to fd on Debian/Ubuntu style systems
+terminal-ux	bat	bat	batcat	Cat with syntax highlighting; command is usually batcat on Debian
+terminal-ux	fzf	fzf	fzf	Fuzzy finder
+terminal-ux	zoxide	zoxide	zoxide	Smart directory jumping
+terminal-ux	direnv	direnv	direnv	Per-directory environment loader
+terminal-ux	starship	starship	starship	Cross-shell prompt when packaged
+terminal-ux	zellij	zellij	zellij	Terminal workspace manager when packaged
+terminal-ux	btop	btop	btop	Resource monitor when packaged
+dev-c	build-essential	build-essential	make	C/C++ build baseline
+dev-c	gcc	gcc	gcc	C compiler
+dev-c	g++	g++	g++	C++ compiler
+dev-c	cmake	cmake	cmake	C/C++ build system
+dev-c	ninja-build	ninja-build	ninja	Fast build backend
+dev-c	meson	meson	meson	Build system
+dev-c	pkg-config	pkg-config	pkg-config	Build metadata helper
+dev-c	gdb	gdb	gdb	GNU debugger
+dev-c	lldb	lldb	lldb	LLVM debugger
+dev-c	clang	clang	clang	LLVM C/C++ compiler
+dev-c	clang-format	clang-format	clang-format	C/C++ formatter
+dev-c	valgrind	valgrind	valgrind	Memory debugging
+rust	rustup	rustup	rustup	Rust toolchain installer when packaged
+rust	cargo	cargo	cargo	Rust package manager
+rust	rustc	rustc	rustc	Rust compiler
+go	golang-go	golang-go	go	Go compiler/toolchain
+zig	zig	zig	zig	Zig compiler when packaged
+python	python3	python3	python3	Python runtime
+python	python3-pip	python3-pip	pip3	Python package installer
+python	python3-venv	python3-venv	python3	venv module
+python	pipx	pipx	pipx	Isolated Python CLI installs
+containers	docker.io	docker.io	docker	Docker engine from Debian repos
+containers	docker-compose-v2	docker-compose-v2	docker	Compose v2 plugin when available
+containers	podman	podman	podman	Rootless container engine
+containers	buildah	buildah	buildah	OCI image builder
+containers	skopeo	skopeo	skopeo	Container image copy/inspect
+networking	dnsutils	dnsutils	dig	DNS query tools
+networking	net-tools	net-tools	netstat	Legacy network tools
+networking	iproute2	iproute2	ip	Modern network tools
+networking	traceroute	traceroute	traceroute	Route tracing
+networking	mtr-tiny	mtr-tiny	mtr	Network path diagnostics
+networking	nmap	nmap	nmap	Network discovery
+networking	tcpdump	tcpdump	tcpdump	Packet capture
+networking	whois	whois	whois	WHOIS lookup
+networking	socat	socat	socat	Socket relay/debug tool
+networking	netcat-openbsd	netcat-openbsd	nc	Netcat implementation
+networking	iperf3	iperf3	iperf3	Network performance testing
+security-lite	ufw	ufw	ufw	Simple firewall
+security-lite	fail2ban	fail2ban	fail2ban-client	Basic brute-force protection
+security-lite	age	age	age	File encryption
+security-lite	pass	pass	pass	Unix password manager
+security-lite	openssh-client	openssh-client	ssh	SSH client security baseline
+debugging	strace	strace	strace	System call tracer
+debugging	ltrace	ltrace	ltrace	Library call tracer
+debugging	perf	linux-perf	perf	Performance tooling when packaged as linux-perf
+debugging	bpftrace	bpftrace	bpftrace	eBPF tracing
+debugging	sysstat	sysstat	iostat	System performance stats
+debugging	lsof	lsof	lsof	Open files/process inspection
+embedded-lite	avrdude	avrdude	avrdude	AVR flashing tool
+embedded-lite	openocd	openocd	openocd	On-chip debugger
+embedded-lite	gcc-arm-none-eabi	gcc-arm-none-eabi	arm-none-eabi-gcc	ARM embedded GCC
+embedded-lite	gdb-multiarch	gdb-multiarch	gdb-multiarch	Multi-architecture debugger

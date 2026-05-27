@@ -4,6 +4,7 @@ set -Eeuo pipefail
 DEFAULT_PROFILE="alp-heavy"
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 UBUNTU_TSV="$SCRIPT_DIR/packages/ubuntu.tsv"
+DEBIAN_TSV="$SCRIPT_DIR/packages/debian.tsv"
 MACOS_TSV="$SCRIPT_DIR/packages/macos.tsv"
 FEDORA_TSV="$SCRIPT_DIR/packages/fedora.tsv"
 ARCH_TSV="$SCRIPT_DIR/packages/arch.tsv"
@@ -26,6 +27,8 @@ BACKEND=""
 
 SELECTED_APT_PACKAGES=()
 AVAILABLE_APT_PACKAGES=()
+SELECTED_DEBIAN_APT_PACKAGES=()
+AVAILABLE_DEBIAN_APT_PACKAGES=()
 SELECTED_BREW_PACKAGES=()
 AVAILABLE_BREW_PACKAGES=()
 SELECTED_DNF_PACKAGES=()
@@ -61,7 +64,7 @@ Options:
   --with-java       Deprecated alias for --add-java; does not install Java.
   --help            Show this help.
 
-Current implementation has Ubuntu, Fedora, Arch, RHEL, and conservative macOS backends. Other backend families are named but not implemented in v0.
+Current implementation has Ubuntu, Debian, Fedora, Arch, RHEL, and conservative macOS backends. Other backend families are named but not implemented in v0.
 USAGE
 }
 
@@ -127,7 +130,7 @@ select_backend() {
 }
 
 require_supported_backend() {
-  if [[ "$BACKEND" == "ubuntu" || "$BACKEND" == "fedora" || "$BACKEND" == "arch" || "$BACKEND" == "rhel" || "$BACKEND" == "macos" ]]; then
+  if [[ "$BACKEND" == "ubuntu" || "$BACKEND" == "debian" || "$BACKEND" == "fedora" || "$BACKEND" == "arch" || "$BACKEND" == "rhel" || "$BACKEND" == "macos" ]]; then
     return 0
   fi
 
@@ -136,7 +139,7 @@ require_supported_backend() {
     return 0
   fi
 
-  die "backend '$BACKEND' for ${OS_NAME} ${OS_VERSION_ID} is planned but not implemented in v0; implemented backends: ubuntu, fedora, arch, rhel, macos; planned backends: $PLANNED_BACKENDS"
+  die "backend '$BACKEND' for ${OS_NAME} ${OS_VERSION_ID} is planned but not implemented in v0; implemented backends: ubuntu, debian, fedora, arch, rhel, macos; planned backends: $PLANNED_BACKENDS"
 }
 
 parse_args() {
@@ -276,6 +279,36 @@ load_ubuntu_packages_from_tsv() {
   ((${#SELECTED_APT_PACKAGES[@]} > 0)) || die "no apt packages selected for profile: $PROFILE"
 }
 
+load_debian_packages_from_tsv() {
+  local package_profile logical_name apt_package command notes
+
+  [[ -r "$DEBIAN_TSV" ]] || die "missing Debian package map: $DEBIAN_TSV"
+
+  SELECTED_DEBIAN_APT_PACKAGES=()
+  SELECTED_COMMANDS=()
+
+  while IFS=$'\t' read -r package_profile logical_name apt_package command notes; do
+    [[ -z "${package_profile:-}" ]] && continue
+    [[ "$package_profile" == "profile" ]] && continue
+
+    if package_profile_selected "$package_profile"; then
+      if [[ -n "${apt_package:-}" ]]; then
+        if ((${#SELECTED_DEBIAN_APT_PACKAGES[@]} == 0)) || ! array_contains "$apt_package" "${SELECTED_DEBIAN_APT_PACKAGES[@]}"; then
+          SELECTED_DEBIAN_APT_PACKAGES+=("$apt_package")
+        fi
+      fi
+
+      if [[ -n "${command:-}" ]]; then
+        if ((${#SELECTED_COMMANDS[@]} == 0)) || ! array_contains "$command" "${SELECTED_COMMANDS[@]}"; then
+          SELECTED_COMMANDS+=("$command")
+        fi
+      fi
+    fi
+  done < "$DEBIAN_TSV"
+
+  ((${#SELECTED_DEBIAN_APT_PACKAGES[@]} > 0)) || die "no Debian apt packages selected for profile: $PROFILE"
+}
+
 load_macos_packages_from_tsv() {
   local package_profile logical_name brew_package command notes
 
@@ -401,6 +434,9 @@ load_package_map() {
     ubuntu)
       load_ubuntu_packages_from_tsv
       ;;
+    debian)
+      load_debian_packages_from_tsv
+      ;;
     macos)
       load_macos_packages_from_tsv
       ;;
@@ -413,7 +449,7 @@ load_package_map() {
     rhel)
       load_rhel_packages_from_tsv
       ;;
-    debian|alpine|suse|centos)
+    alpine|suse|centos)
       load_ubuntu_packages_from_tsv
       ;;
     *)
@@ -457,6 +493,42 @@ install_ubuntu_packages() {
 
   log "available apt packages: ${AVAILABLE_APT_PACKAGES[*]}"
   sudo DEBIAN_FRONTEND=noninteractive apt install -y "${AVAILABLE_APT_PACKAGES[@]}"
+}
+
+filter_available_debian_packages() {
+  local package
+
+  AVAILABLE_DEBIAN_APT_PACKAGES=()
+
+  log "checking Debian package availability"
+
+  for package in "${SELECTED_DEBIAN_APT_PACKAGES[@]}"; do
+    if apt-cache show "$package" >/dev/null 2>&1; then
+      AVAILABLE_DEBIAN_APT_PACKAGES+=("$package")
+    else
+      warn "skipping unavailable Debian apt package: $package"
+    fi
+  done
+
+  ((${#AVAILABLE_DEBIAN_APT_PACKAGES[@]} > 0)) || die "no available Debian apt packages remained for profile: $PROFILE"
+}
+
+install_debian_packages() {
+  log "selected profile: $PROFILE"
+  log "selected Debian apt packages: ${SELECTED_DEBIAN_APT_PACKAGES[*]}"
+
+  if (( DRY_RUN )); then
+    log "dry-run: sudo apt update"
+    log "dry-run: check Debian apt availability for selected packages"
+    log "dry-run: sudo DEBIAN_FRONTEND=noninteractive apt install -y ${SELECTED_DEBIAN_APT_PACKAGES[*]}"
+    return 0
+  fi
+
+  sudo apt update
+  filter_available_debian_packages
+
+  log "available Debian apt packages: ${AVAILABLE_DEBIAN_APT_PACKAGES[*]}"
+  sudo DEBIAN_FRONTEND=noninteractive apt install -y "${AVAILABLE_DEBIAN_APT_PACKAGES[@]}"
 }
 
 ensure_homebrew() {
@@ -656,6 +728,9 @@ install_packages() {
     ubuntu)
       install_ubuntu_packages
       ;;
+    debian)
+      install_debian_packages
+      ;;
     macos)
       install_macos_packages
       ;;
@@ -668,7 +743,7 @@ install_packages() {
     rhel)
       install_rhel_packages
       ;;
-    debian|alpine|suse|centos)
+    alpine|suse|centos)
       if (( DRY_RUN )); then
         log "dry-run: backend '$BACKEND' is not implemented yet; Ubuntu package map is being shown as the current v0 plan"
         log "dry-run: selected profile: $PROFILE"
@@ -711,8 +786,8 @@ setup_user_dirs() {
   mkdir -p "${dirs[@]}"
 }
 
-setup_ubuntu_compat_symlinks() {
-  log "setting up Ubuntu fd/bat compatibility symlinks"
+setup_debian_family_compat_symlinks() {
+  log "setting up Debian-family fd/bat compatibility symlinks"
 
   if [[ -x /usr/bin/fdfind && ! -e "$HOME/.local/bin/fd" ]]; then
     if (( DRY_RUN )); then
@@ -918,7 +993,12 @@ main() {
 
   case "$BACKEND" in
     ubuntu)
-      setup_ubuntu_compat_symlinks
+      setup_debian_family_compat_symlinks
+      setup_bashrc_loader
+      setup_bash_qol
+      ;;
+    debian)
+      setup_debian_family_compat_symlinks
       setup_bashrc_loader
       setup_bash_qol
       ;;
