@@ -134,11 +134,7 @@ Planned profiles:
 profile. Fedora GUI/rice profiles are future work. Profile behavior is still
 simple and based on TSV package rows.
 
-<<<<<<< HEAD
-## Java stance
-=======
 ## about Java
->>>>>>> 5690fea (add fedora backend)
 
 Java is not installed by default.
 
@@ -179,15 +175,10 @@ The macOS defaults are intentionally small:
 
 Backups and stronger dry-run coverage are still future work.
 
-<<<<<<< HEAD
-## Repository layout
-=======
 ## Repo layout
->>>>>>> 5690fea (add fedora backend)
 
 - `README.md` - practical entry notes.
 - `alp-linux-oneshot-bootstrap.sh` - current bootstrap script.
 - `packages/ubuntu.tsv` - Ubuntu apt package map.
 - `packages/fedora.tsv` - Fedora dnf package map.
 - `packages/macos.tsv` - macOS Homebrew package map.
-- `docs/guru-survey.md` - survey notes used to shape early decisions.
