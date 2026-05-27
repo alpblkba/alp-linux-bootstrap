@@ -1,30 +1,31 @@
 # alp-linux-bootstrap
 
-This is my bootstrap repository for setting up Linux and macOS machines.
+This is my own bootstrap repository for setting up Linux and macOS machines.
 
 It installs packages, creates a small directory layout, adds conservative shell
 helpers, and keeps package lists split by platform. The current working backends
-are Ubuntu and macOS. Other distributions are planned but not implemented yet.
+are Ubuntu, Fedora, and macOS. Other distributions are planned but not
+implemented yet.
 
-This is not meant to be a universal dotfiles framework. It is a setup script
+It is a setup script
 that should stay readable enough to review, edit, and run again.
 
 ## Current Status
 
 - Ubuntu backend: apt package install, bash setup, and Ubuntu compatibility
   symlinks for tools such as `fd` and `bat`.
+- Fedora backend: dnf package install and bash setup.
 - macOS backend: Homebrew package install, zsh setup, and conservative macOS
   defaults.
 - Other backends: named/planned stubs only.
 - GUI/rice: not in the default path.
-- Java/JVM tooling: excluded by default.
 
 The project is still early. Review the script and package maps before running a
 real install.
 
-Package maps are also early. Some Ubuntu apt packages and Homebrew formulae may
-be unavailable on a given OS version; the script filters unavailable packages
-before real installs.
+Package maps are also early. Some apt, dnf, and Homebrew packages may be
+unavailable on a given OS version; the script filters unavailable packages before
+real installs where practical.
 
 ## Usage
 
@@ -42,25 +43,35 @@ macOS:
 ./alp-linux-oneshot-bootstrap.sh --profile alp-heavy
 ```
 
+Fedora:
+
+```bash
+./alp-linux-oneshot-bootstrap.sh --dry-run
+./alp-linux-oneshot-bootstrap.sh --profile alp-heavy
+```
+
 Useful flags:
 
 - `--dry-run` - print what would happen.
 - `--profile <name>` - choose a profile. Default: `alp-heavy`.
 - `--no-java` - keep Java/JVM tooling excluded. Default.
-- `--with-java` - explicit placeholder; Java is not implemented yet.
+- `--add-java` - reserved opt-in placeholder; Java is not implemented yet.
+- `--with-java` - deprecated alias for `--add-java`.
 - `--help` - show script help.
 
-## Supported And Planned Systems
+## Supported and planned systems
 
 Implemented now:
 
 - Ubuntu: real apt install path.
+- Fedora: real dnf install path.
 - macOS: real Homebrew install path, assuming Homebrew is already installed.
+
+Backends are currently family-based, not version-specific.
 
 Planned backend families:
 
 - Debian
-- Fedora
 - Arch
 - Alpine
 - RHEL
@@ -78,7 +89,7 @@ Longer-term target list:
 - RHEL 7/8/9
 - CentOS 7/8
 - openSUSE/SUSE latest, initially openSUSE Tumbleweed
-- experimental or devops-oriented OSes later, if useful
+- experimental OSes later, if useful
 
 WSL support should be enough to avoid breaking, not a separate WSL-first setup.
 
@@ -86,27 +97,48 @@ WSL support should be enough to avoid breaking, not a separate WSL-first setup.
 
 The default profile is `alp-heavy`.
 
-Profiles currently used or planned:
+Implemented package groups:
 
 - `core`
 - `server`
-- `desktop`
-- `alp-heavy`
-- `terminal-rice`
-- `gui-rice`
-- `devops`
+- `terminal-ux`
+- `dev-c`
+- `rust`
+- `go`
+- `zig`
+- `python`
 - `containers`
 - `networking`
 - `security-lite`
-- `embedded`
+- `debugging`
+- `embedded-lite`
+
+Synthetic profile:
+
+- `alp-heavy` = `core` + `server` + `terminal-ux` + `dev-c` + `rust` + `go` +
+  `zig` + `python` + `containers` + `networking` + `security-lite` +
+  `debugging` + `embedded-lite`
+
+Planned profiles:
+
+- `desktop`
+- `terminal-rice`
+- `gui-rice`
+- `devops`
 - `fpga-hardware`
 - `memory-debugging`
 - `macos`
 - `no-java`
 
-Profile behavior is still simple and based on TSV package rows.
+`alp-heavy` is broad CLI/devops/low-level setup. It is not a GUI or rice
+profile. Fedora GUI/rice profiles are future work. Profile behavior is still
+simple and based on TSV package rows.
 
+<<<<<<< HEAD
 ## Java stance
+=======
+## about Java
+>>>>>>> 5690fea (add fedora backend)
 
 Java is not installed by default.
 
@@ -147,10 +179,15 @@ The macOS defaults are intentionally small:
 
 Backups and stronger dry-run coverage are still future work.
 
+<<<<<<< HEAD
 ## Repository layout
+=======
+## Repo layout
+>>>>>>> 5690fea (add fedora backend)
 
 - `README.md` - practical entry notes.
 - `alp-linux-oneshot-bootstrap.sh` - current bootstrap script.
 - `packages/ubuntu.tsv` - Ubuntu apt package map.
+- `packages/fedora.tsv` - Fedora dnf package map.
 - `packages/macos.tsv` - macOS Homebrew package map.
 - `docs/guru-survey.md` - survey notes used to shape early decisions.

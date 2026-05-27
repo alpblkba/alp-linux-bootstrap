@@ -1,0 +1,85 @@
+profile	logical_name	dnf_package	command	notes
+core	ca-certificates	ca-certificates	ca-certificates	HTTPS trust store placeholder; no normal interactive command
+core	curl	curl	curl	HTTP client
+core	wget	wget	wget	Simple file fetcher
+core	git	git	git	Version control baseline
+core	gnupg	gnupg2	gpg	Package signing and key management
+core	redhat-lsb-core	redhat-lsb-core	lsb_release	Distribution metadata helper when packaged
+core	unzip	unzip	unzip	Archive extraction
+core	zip	zip	zip	Archive creation
+core	tar	tar	tar	Archive handling
+core	rsync	rsync	rsync	File synchronization
+core	openssh-clients	openssh-clients	ssh	SSH client
+core	htop	htop	htop	Interactive process viewer
+core	tmux	tmux	tmux	Terminal multiplexer
+core	tree	tree	tree	Directory tree viewer
+core	jq	jq	jq	JSON processor
+core	yq	yq	yq	YAML processor when packaged
+core	ShellCheck	ShellCheck	shellcheck	Shell script linter
+core	shfmt	shfmt	shfmt	Shell formatter when packaged
+server	openssh-server	openssh-server	sshd	SSH server
+server	vim-enhanced	vim-enhanced	vim	Terminal editor
+server	acl	acl	getfacl	POSIX ACL tooling
+server	logrotate	logrotate	logrotate	Log rotation
+server	needrestart	needrestart	needrestart	Service restart hints when packaged
+terminal-ux	ripgrep	ripgrep	rg	Fast recursive search
+terminal-ux	fd-find	fd-find	fd	Fast find alternative
+terminal-ux	bat	bat	bat	Cat with syntax highlighting
+terminal-ux	fzf	fzf	fzf	Fuzzy finder
+terminal-ux	zoxide	zoxide	zoxide	Smart directory jumping
+terminal-ux	direnv	direnv	direnv	Per-directory environment loader
+terminal-ux	starship	starship	starship	Cross-shell prompt when packaged
+terminal-ux	zellij	zellij	zellij	Terminal workspace manager when packaged
+terminal-ux	btop	btop	btop	Resource monitor
+dev-c	gcc	gcc	gcc	C compiler
+dev-c	gcc-c++	gcc-c++	g++	C++ compiler
+dev-c	make	make	make	Build baseline
+dev-c	cmake	cmake	cmake	C/C++ build system
+dev-c	ninja-build	ninja-build	ninja	Fast build backend
+dev-c	meson	meson	meson	Build system
+dev-c	pkgconf-pkg-config	pkgconf-pkg-config	pkg-config	Build metadata helper
+dev-c	gdb	gdb	gdb	GNU debugger
+dev-c	lldb	lldb	lldb	LLVM debugger
+dev-c	clang	clang	clang	LLVM C/C++ compiler
+dev-c	clang-tools-extra	clang-tools-extra	clang-format	Clang extra tools and formatter
+dev-c	valgrind	valgrind	valgrind	Memory debugging
+rust	rustup	rustup	rustup	Rust toolchain installer when packaged
+rust	cargo	cargo	cargo	Rust package manager
+rust	rust	rustc	rustc	Rust compiler when packaged
+go	golang	golang	go	Go compiler/toolchain
+zig	zig	zig	zig	Zig compiler when packaged
+python	python3	python3	python3	Python runtime
+python	python3-pip	python3-pip	pip3	Python package installer
+python	python3-virtualenv	python3-virtualenv	virtualenv	Python virtualenv helper when packaged
+python	pipx	pipx	pipx	Isolated Python CLI installs
+containers	podman	podman	podman	Rootless container engine
+containers	buildah	buildah	buildah	OCI image builder
+containers	skopeo	skopeo	skopeo	Container image copy/inspect
+containers	docker-cli	docker-cli	docker	Docker CLI when packaged
+containers	docker-compose	docker-compose	docker-compose	Docker Compose when packaged
+networking	bind-utils	bind-utils	dig	DNS query tools
+networking	net-tools	net-tools	netstat	Legacy network tools
+networking	iproute	iproute	ip	Modern network tools
+networking	traceroute	traceroute	traceroute	Route tracing
+networking	mtr	mtr	mtr	Network path diagnostics
+networking	nmap	nmap	nmap	Network discovery
+networking	tcpdump	tcpdump	tcpdump	Packet capture
+networking	whois	whois	whois	WHOIS lookup
+networking	socat	socat	socat	Socket relay/debug tool
+networking	nmap-ncat	nmap-ncat	nc	Netcat implementation
+networking	iperf3	iperf3	iperf3	Network performance testing
+security-lite	firewalld	firewalld	firewall-cmd	Fedora firewall management
+security-lite	fail2ban	fail2ban	fail2ban-client	Basic brute-force protection
+security-lite	age	age	age	File encryption
+security-lite	pass	pass	pass	Unix password manager
+security-lite	openssh-clients	openssh-clients	ssh	SSH client security baseline
+debugging	strace	strace	strace	System call tracer
+debugging	ltrace	ltrace	ltrace	Library call tracer when packaged
+debugging	perf	perf	perf	Performance tooling
+debugging	bpftrace	bpftrace	bpftrace	eBPF tracing
+debugging	sysstat	sysstat	iostat	System performance stats
+debugging	lsof	lsof	lsof	Open files/process inspection
+embedded-lite	avrdude	avrdude	avrdude	AVR flashing tool
+embedded-lite	openocd	openocd	openocd	On-chip debugger
+embedded-lite	arm-none-eabi-gcc	arm-none-eabi-gcc	arm-none-eabi-gcc	ARM embedded GCC when packaged
+embedded-lite	gdb-gdbserver	gdb-gdbserver	gdbserver	GDB server tooling when packaged

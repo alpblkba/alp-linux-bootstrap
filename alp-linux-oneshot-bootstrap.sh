@@ -5,13 +5,15 @@ DEFAULT_PROFILE="alp-heavy"
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 UBUNTU_TSV="$SCRIPT_DIR/packages/ubuntu.tsv"
 MACOS_TSV="$SCRIPT_DIR/packages/macos.tsv"
+FEDORA_TSV="$SCRIPT_DIR/packages/fedora.tsv"
 CHECK_SCRIPT="/tmp/check-alp-bootstrap-tools.sh"
 PLANNED_BACKENDS="ubuntu, debian, fedora, arch, alpine, suse, rhel, centos, macos"
 
 DRY_RUN=0
 PROFILE="$DEFAULT_PROFILE"
 NO_JAVA=1
-WITH_JAVA=0
+ADD_JAVA=0
+JAVA_FLAG_SOURCE=""
 
 OS_ID=""
 OS_NAME=""
@@ -24,6 +26,8 @@ SELECTED_APT_PACKAGES=()
 AVAILABLE_APT_PACKAGES=()
 SELECTED_BREW_PACKAGES=()
 AVAILABLE_BREW_PACKAGES=()
+SELECTED_DNF_PACKAGES=()
+AVAILABLE_DNF_PACKAGES=()
 SELECTED_COMMANDS=()
 
 log() {
@@ -47,10 +51,11 @@ Options:
   --dry-run          Print packages and actions without applying them.
   --profile <name>  Select profile to install. Default: alp-heavy.
   --no-java         Keep Java/JVM tooling excluded. Default.
-  --with-java       Explicit Java opt-in placeholder; does not install Java.
+  --add-java        Reserved Java/JVM opt-in placeholder; does not install Java.
+  --with-java       Deprecated alias for --add-java; does not install Java.
   --help            Show this help.
 
-Current implementation is Ubuntu-first with conservative macOS Homebrew support. Other backend families are named but not implemented in v0.
+Current implementation has Ubuntu, Fedora, and conservative macOS backends. Other backend families are named but not implemented in v0.
 USAGE
 }
 
@@ -116,7 +121,7 @@ select_backend() {
 }
 
 require_supported_backend() {
-  if [[ "$BACKEND" == "ubuntu" || "$BACKEND" == "macos" ]]; then
+  if [[ "$BACKEND" == "ubuntu" || "$BACKEND" == "fedora" || "$BACKEND" == "macos" ]]; then
     return 0
   fi
 
@@ -125,7 +130,7 @@ require_supported_backend() {
     return 0
   fi
 
-  die "backend '$BACKEND' for ${OS_NAME} ${OS_VERSION_ID} is planned but not implemented in v0; implemented backends: ubuntu, macos; planned backends: $PLANNED_BACKENDS"
+  die "backend '$BACKEND' for ${OS_NAME} ${OS_VERSION_ID} is planned but not implemented in v0; implemented backends: ubuntu, fedora, macos; planned backends: $PLANNED_BACKENDS"
 }
 
 parse_args() {
@@ -142,12 +147,20 @@ parse_args() {
         ;;
       --no-java)
         NO_JAVA=1
-        WITH_JAVA=0
+        ADD_JAVA=0
+        JAVA_FLAG_SOURCE=""
+        shift
+        ;;
+      --add-java)
+        ADD_JAVA=1
+        NO_JAVA=0
+        JAVA_FLAG_SOURCE="--add-java"
         shift
         ;;
       --with-java)
-        WITH_JAVA=1
+        ADD_JAVA=1
         NO_JAVA=0
+        JAVA_FLAG_SOURCE="--with-java"
         shift
         ;;
       --help|-h)
@@ -287,6 +300,36 @@ load_macos_packages_from_tsv() {
   ((${#SELECTED_BREW_PACKAGES[@]} > 0)) || die "no Homebrew packages selected for profile: $PROFILE"
 }
 
+load_fedora_packages_from_tsv() {
+  local package_profile logical_name dnf_package command notes
+
+  [[ -r "$FEDORA_TSV" ]] || die "missing Fedora package map: $FEDORA_TSV"
+
+  SELECTED_DNF_PACKAGES=()
+  SELECTED_COMMANDS=()
+
+  while IFS=$'\t' read -r package_profile logical_name dnf_package command notes; do
+    [[ -z "${package_profile:-}" ]] && continue
+    [[ "$package_profile" == "profile" ]] && continue
+
+    if package_profile_selected "$package_profile"; then
+      if [[ -n "${dnf_package:-}" ]]; then
+        if ((${#SELECTED_DNF_PACKAGES[@]} == 0)) || ! array_contains "$dnf_package" "${SELECTED_DNF_PACKAGES[@]}"; then
+          SELECTED_DNF_PACKAGES+=("$dnf_package")
+        fi
+      fi
+
+      if [[ -n "${command:-}" ]]; then
+        if ((${#SELECTED_COMMANDS[@]} == 0)) || ! array_contains "$command" "${SELECTED_COMMANDS[@]}"; then
+          SELECTED_COMMANDS+=("$command")
+        fi
+      fi
+    fi
+  done < "$FEDORA_TSV"
+
+  ((${#SELECTED_DNF_PACKAGES[@]} > 0)) || die "no dnf packages selected for profile: $PROFILE"
+}
+
 load_package_map() {
   case "$BACKEND" in
     ubuntu)
@@ -295,7 +338,10 @@ load_package_map() {
     macos)
       load_macos_packages_from_tsv
       ;;
-    debian|fedora|arch|alpine|suse|rhel|centos)
+    fedora)
+      load_fedora_packages_from_tsv
+      ;;
+    debian|arch|alpine|suse|rhel|centos)
       load_ubuntu_packages_from_tsv
       ;;
     *)
@@ -392,6 +438,65 @@ install_macos_packages() {
   brew install "${AVAILABLE_BREW_PACKAGES[@]}"
 }
 
+ensure_dnf() {
+  if command -v dnf >/dev/null 2>&1; then
+    return 0
+  fi
+
+  die "dnf is required for the Fedora backend, but dnf was not found"
+}
+
+dnf_package_available() {
+  local package="$1"
+
+  if dnf repoquery --available "$package" >/dev/null 2>&1; then
+    return 0
+  fi
+
+  if dnf list --available "$package" >/dev/null 2>&1; then
+    return 0
+  fi
+
+  return 1
+}
+
+filter_available_fedora_packages() {
+  local package
+
+  AVAILABLE_DNF_PACKAGES=()
+
+  log "checking Fedora package availability"
+
+  for package in "${SELECTED_DNF_PACKAGES[@]}"; do
+    if dnf_package_available "$package"; then
+      AVAILABLE_DNF_PACKAGES+=("$package")
+    else
+      warn "skipping unavailable dnf package: $package"
+    fi
+  done
+
+  ((${#AVAILABLE_DNF_PACKAGES[@]} > 0)) || die "no available dnf packages remained for profile: $PROFILE"
+}
+
+install_fedora_packages() {
+  log "selected profile: $PROFILE"
+  log "selected dnf packages: ${SELECTED_DNF_PACKAGES[*]}"
+
+  if (( DRY_RUN )); then
+    log "dry-run: sudo dnf makecache"
+    log "dry-run: check dnf availability for selected packages"
+    log "dry-run: sudo dnf install -y ${SELECTED_DNF_PACKAGES[*]}"
+    return 0
+  fi
+
+  ensure_dnf
+  sudo dnf makecache
+  filter_available_fedora_packages
+
+  log "available dnf packages: ${AVAILABLE_DNF_PACKAGES[*]}"
+  sudo dnf install -y "${AVAILABLE_DNF_PACKAGES[@]}"
+}
+
 install_packages() {
   case "$BACKEND" in
     ubuntu)
@@ -400,7 +505,10 @@ install_packages() {
     macos)
       install_macos_packages
       ;;
-    debian|fedora|arch|alpine|suse|rhel|centos)
+    fedora)
+      install_fedora_packages
+      ;;
+    debian|arch|alpine|suse|rhel|centos)
       if (( DRY_RUN )); then
         log "dry-run: backend '$BACKEND' is not implemented yet; Ubuntu package map is being shown as the current v0 plan"
         log "dry-run: selected profile: $PROFILE"
@@ -635,8 +743,11 @@ main() {
 
   log "detected: ${OS_NAME} ${OS_VERSION_ID} (${OS_ID}, ${OS_ARCH}); backend: $BACKEND"
 
-  if (( WITH_JAVA )); then
-    warn "Java is intentionally opt-in and not implemented in this skeleton; no Java packages will be installed"
+  if (( ADD_JAVA )); then
+    if [[ "$JAVA_FLAG_SOURCE" == "--with-java" ]]; then
+      warn "--with-java is a deprecated alias for --add-java"
+    fi
+    warn "Java/JVM opt-in is reserved but not implemented yet; no Java packages will be installed"
   elif (( NO_JAVA )); then
     log "Java/JVM tooling excluded by default"
   fi
@@ -648,6 +759,10 @@ main() {
   case "$BACKEND" in
     ubuntu)
       setup_ubuntu_compat_symlinks
+      setup_bashrc_loader
+      setup_bash_qol
+      ;;
+    fedora)
       setup_bashrc_loader
       setup_bash_qol
       ;;
