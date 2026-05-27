@@ -6,6 +6,7 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 UBUNTU_TSV="$SCRIPT_DIR/packages/ubuntu.tsv"
 MACOS_TSV="$SCRIPT_DIR/packages/macos.tsv"
 FEDORA_TSV="$SCRIPT_DIR/packages/fedora.tsv"
+ARCH_TSV="$SCRIPT_DIR/packages/arch.tsv"
 CHECK_SCRIPT="/tmp/check-alp-bootstrap-tools.sh"
 PLANNED_BACKENDS="ubuntu, debian, fedora, arch, alpine, suse, rhel, centos, macos"
 
@@ -28,6 +29,8 @@ SELECTED_BREW_PACKAGES=()
 AVAILABLE_BREW_PACKAGES=()
 SELECTED_DNF_PACKAGES=()
 AVAILABLE_DNF_PACKAGES=()
+SELECTED_PACMAN_PACKAGES=()
+AVAILABLE_PACMAN_PACKAGES=()
 SELECTED_COMMANDS=()
 
 log() {
@@ -55,7 +58,7 @@ Options:
   --with-java       Deprecated alias for --add-java; does not install Java.
   --help            Show this help.
 
-Current implementation has Ubuntu, Fedora, and conservative macOS backends. Other backend families are named but not implemented in v0.
+Current implementation has Ubuntu, Fedora, Arch, and conservative macOS backends. Other backend families are named but not implemented in v0.
 USAGE
 }
 
@@ -121,7 +124,7 @@ select_backend() {
 }
 
 require_supported_backend() {
-  if [[ "$BACKEND" == "ubuntu" || "$BACKEND" == "fedora" || "$BACKEND" == "macos" ]]; then
+  if [[ "$BACKEND" == "ubuntu" || "$BACKEND" == "fedora" || "$BACKEND" == "arch" || "$BACKEND" == "macos" ]]; then
     return 0
   fi
 
@@ -130,7 +133,7 @@ require_supported_backend() {
     return 0
   fi
 
-  die "backend '$BACKEND' for ${OS_NAME} ${OS_VERSION_ID} is planned but not implemented in v0; implemented backends: ubuntu, fedora, macos; planned backends: $PLANNED_BACKENDS"
+  die "backend '$BACKEND' for ${OS_NAME} ${OS_VERSION_ID} is planned but not implemented in v0; implemented backends: ubuntu, fedora, arch, macos; planned backends: $PLANNED_BACKENDS"
 }
 
 parse_args() {
@@ -330,6 +333,36 @@ load_fedora_packages_from_tsv() {
   ((${#SELECTED_DNF_PACKAGES[@]} > 0)) || die "no dnf packages selected for profile: $PROFILE"
 }
 
+load_arch_packages_from_tsv() {
+  local package_profile logical_name pacman_package command notes
+
+  [[ -r "$ARCH_TSV" ]] || die "missing Arch package map: $ARCH_TSV"
+
+  SELECTED_PACMAN_PACKAGES=()
+  SELECTED_COMMANDS=()
+
+  while IFS=$'\t' read -r package_profile logical_name pacman_package command notes; do
+    [[ -z "${package_profile:-}" ]] && continue
+    [[ "$package_profile" == "profile" ]] && continue
+
+    if package_profile_selected "$package_profile"; then
+      if [[ -n "${pacman_package:-}" ]]; then
+        if ((${#SELECTED_PACMAN_PACKAGES[@]} == 0)) || ! array_contains "$pacman_package" "${SELECTED_PACMAN_PACKAGES[@]}"; then
+          SELECTED_PACMAN_PACKAGES+=("$pacman_package")
+        fi
+      fi
+
+      if [[ -n "${command:-}" ]]; then
+        if ((${#SELECTED_COMMANDS[@]} == 0)) || ! array_contains "$command" "${SELECTED_COMMANDS[@]}"; then
+          SELECTED_COMMANDS+=("$command")
+        fi
+      fi
+    fi
+  done < "$ARCH_TSV"
+
+  ((${#SELECTED_PACMAN_PACKAGES[@]} > 0)) || die "no pacman packages selected for profile: $PROFILE"
+}
+
 load_package_map() {
   case "$BACKEND" in
     ubuntu)
@@ -341,7 +374,10 @@ load_package_map() {
     fedora)
       load_fedora_packages_from_tsv
       ;;
-    debian|arch|alpine|suse|rhel|centos)
+    arch)
+      load_arch_packages_from_tsv
+      ;;
+    debian|alpine|suse|rhel|centos)
       load_ubuntu_packages_from_tsv
       ;;
     *)
@@ -497,6 +533,51 @@ install_fedora_packages() {
   sudo dnf install -y "${AVAILABLE_DNF_PACKAGES[@]}"
 }
 
+ensure_pacman() {
+  if command -v pacman >/dev/null 2>&1; then
+    return 0
+  fi
+
+  die "pacman is required for the Arch backend, but pacman was not found"
+}
+
+filter_available_arch_packages() {
+  local package
+
+  AVAILABLE_PACMAN_PACKAGES=()
+
+  log "checking Arch package availability in official pacman repositories"
+
+  for package in "${SELECTED_PACMAN_PACKAGES[@]}"; do
+    if pacman -Si "$package" >/dev/null 2>&1; then
+      AVAILABLE_PACMAN_PACKAGES+=("$package")
+    else
+      warn "skipping unavailable pacman package: $package"
+    fi
+  done
+
+  ((${#AVAILABLE_PACMAN_PACKAGES[@]} > 0)) || die "no available pacman packages remained for profile: $PROFILE"
+}
+
+install_arch_packages() {
+  log "selected profile: $PROFILE"
+  log "selected pacman packages: ${SELECTED_PACMAN_PACKAGES[*]}"
+
+  if (( DRY_RUN )); then
+    log "dry-run: sudo pacman -Sy"
+    log "dry-run: check pacman availability in official repos for selected packages"
+    log "dry-run: sudo pacman -S --needed --noconfirm ${SELECTED_PACMAN_PACKAGES[*]}"
+    return 0
+  fi
+
+  ensure_pacman
+  sudo pacman -Sy
+  filter_available_arch_packages
+
+  log "available pacman packages: ${AVAILABLE_PACMAN_PACKAGES[*]}"
+  sudo pacman -S --needed --noconfirm "${AVAILABLE_PACMAN_PACKAGES[@]}"
+}
+
 install_packages() {
   case "$BACKEND" in
     ubuntu)
@@ -508,7 +589,10 @@ install_packages() {
     fedora)
       install_fedora_packages
       ;;
-    debian|arch|alpine|suse|rhel|centos)
+    arch)
+      install_arch_packages
+      ;;
+    debian|alpine|suse|rhel|centos)
       if (( DRY_RUN )); then
         log "dry-run: backend '$BACKEND' is not implemented yet; Ubuntu package map is being shown as the current v0 plan"
         log "dry-run: selected profile: $PROFILE"
@@ -763,6 +847,10 @@ main() {
       setup_bash_qol
       ;;
     fedora)
+      setup_bashrc_loader
+      setup_bash_qol
+      ;;
+    arch)
       setup_bashrc_loader
       setup_bash_qol
       ;;

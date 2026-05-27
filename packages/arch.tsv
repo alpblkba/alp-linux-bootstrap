@@ -1,0 +1,84 @@
+profile	logical_name	pacman_package	command	notes
+core	ca-certificates	ca-certificates	ca-certificates	HTTPS trust store placeholder; no normal interactive command
+core	curl	curl	curl	HTTP client
+core	wget	wget	wget	Simple file fetcher
+core	git	git	git	Version control baseline
+core	gnupg	gnupg	gpg	Package signing and key management
+core	lsb-release	lsb-release	lsb_release	Distribution metadata helper
+core	unzip	unzip	unzip	Archive extraction
+core	zip	zip	zip	Archive creation
+core	tar	tar	tar	Archive handling
+core	rsync	rsync	rsync	File synchronization
+core	openssh	openssh	ssh	SSH client and server package
+core	htop	htop	htop	Interactive process viewer
+core	tmux	tmux	tmux	Terminal multiplexer
+core	tree	tree	tree	Directory tree viewer
+core	jq	jq	jq	JSON processor
+core	yq	yq	yq	YAML processor
+core	shellcheck	shellcheck	shellcheck	Shell script linter
+core	shfmt	shfmt	shfmt	Shell formatter
+server	openssh	openssh	sshd	SSH daemon via openssh package
+server	neovim	neovim	nvim	Modern terminal editor
+server	vim	vim	vim	Terminal editor
+server	acl	acl	getfacl	POSIX ACL tooling
+server	logrotate	logrotate	logrotate	Log rotation
+terminal-ux	ripgrep	ripgrep	rg	Fast recursive search
+terminal-ux	fd	fd	fd	Fast find alternative
+terminal-ux	bat	bat	bat	Cat with syntax highlighting
+terminal-ux	fzf	fzf	fzf	Fuzzy finder
+terminal-ux	zoxide	zoxide	zoxide	Smart directory jumping
+terminal-ux	direnv	direnv	direnv	Per-directory environment loader
+terminal-ux	starship	starship	starship	Cross-shell prompt
+terminal-ux	zellij	zellij	zellij	Terminal workspace manager
+terminal-ux	btop	btop	btop	Resource monitor
+terminal-ux	eza	eza	eza	Modern ls replacement when wanted explicitly
+dev-c	base-devel	base-devel	make	Arch build baseline group; includes make and common build tools
+dev-c	gcc	gcc	gcc	C/C++ compiler
+dev-c	cmake	cmake	cmake	C/C++ build system
+dev-c	ninja	ninja	ninja	Fast build backend
+dev-c	meson	meson	meson	Build system
+dev-c	pkgconf	pkgconf	pkg-config	Build metadata helper
+dev-c	gdb	gdb	gdb	GNU debugger
+dev-c	lldb	lldb	lldb	LLVM debugger
+dev-c	clang	clang	clang	LLVM C/C++ compiler and tools
+dev-c	valgrind	valgrind	valgrind	Memory debugging
+rust	rustup	rustup	rustup	Rust toolchain installer
+rust	cargo	cargo	cargo	Rust package manager
+rust	rust	rustc	rustc	Rust compiler
+go	go	go	go	Go compiler/toolchain
+zig	zig	zig	zig	Zig compiler
+python	python	python	python3	Python runtime
+python	python-pip	python-pip	pip3	Python package installer
+python	python-virtualenv	python-virtualenv	virtualenv	Python virtualenv helper
+python	python-pipx	python-pipx	pipx	Isolated Python CLI installs
+containers	podman	podman	podman	Rootless container engine
+containers	buildah	buildah	buildah	OCI image builder
+containers	skopeo	skopeo	skopeo	Container image copy/inspect
+containers	docker	docker	docker	Docker engine and CLI
+containers	docker-compose	docker-compose	docker-compose	Docker Compose
+networking	bind	bind	dig	DNS query tools
+networking	net-tools	net-tools	netstat	Legacy network tools
+networking	iproute2	iproute2	ip	Modern network tools
+networking	traceroute	traceroute	traceroute	Route tracing
+networking	mtr	mtr	mtr	Network path diagnostics
+networking	nmap	nmap	nmap	Network discovery
+networking	tcpdump	tcpdump	tcpdump	Packet capture
+networking	whois	whois	whois	WHOIS lookup
+networking	socat	socat	socat	Socket relay/debug tool
+networking	openbsd-netcat	openbsd-netcat	nc	Netcat implementation
+networking	iperf3	iperf3	iperf3	Network performance testing
+security-lite	ufw	ufw	ufw	Simple firewall
+security-lite	fail2ban	fail2ban	fail2ban-client	Basic brute-force protection
+security-lite	age	age	age	File encryption
+security-lite	pass	pass	pass	Unix password manager
+security-lite	openssh	openssh	ssh	SSH client security baseline
+debugging	strace	strace	strace	System call tracer
+debugging	ltrace	ltrace	ltrace	Library call tracer
+debugging	perf	perf	perf	Performance tooling
+debugging	bpftrace	bpftrace	bpftrace	eBPF tracing
+debugging	sysstat	sysstat	iostat	System performance stats
+debugging	lsof	lsof	lsof	Open files/process inspection
+embedded-lite	avrdude	avrdude	avrdude	AVR flashing tool
+embedded-lite	openocd	openocd	openocd	On-chip debugger
+embedded-lite	arm-none-eabi-gcc	arm-none-eabi-gcc	arm-none-eabi-gcc	ARM embedded GCC when packaged
+embedded-lite	arm-none-eabi-gdb	arm-none-eabi-gdb	arm-none-eabi-gdb	ARM embedded GDB when packaged
