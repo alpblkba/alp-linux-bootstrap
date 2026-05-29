@@ -9,8 +9,10 @@ MACOS_TSV="$SCRIPT_DIR/packages/macos.tsv"
 FEDORA_TSV="$SCRIPT_DIR/packages/fedora.tsv"
 ARCH_TSV="$SCRIPT_DIR/packages/arch.tsv"
 RHEL_TSV="$SCRIPT_DIR/packages/rhel.tsv"
+ALPINE_TSV="$SCRIPT_DIR/packages/alpine.tsv"
 CHECK_SCRIPT="/tmp/check-alp-bootstrap-tools.sh"
-PLANNED_BACKENDS="ubuntu, debian, fedora, arch, alpine, suse, rhel, centos, macos"
+IMPLEMENTED_BACKENDS="ubuntu, debian, fedora, arch, rhel, alpine, macos"
+PLANNED_BACKENDS="centos, suse"
 
 DRY_RUN=0
 PROFILE="$DEFAULT_PROFILE"
@@ -37,6 +39,8 @@ SELECTED_PACMAN_PACKAGES=()
 AVAILABLE_PACMAN_PACKAGES=()
 SELECTED_RHEL_DNF_PACKAGES=()
 AVAILABLE_RHEL_DNF_PACKAGES=()
+SELECTED_APK_PACKAGES=()
+AVAILABLE_APK_PACKAGES=()
 SELECTED_COMMANDS=()
 
 log() {
@@ -64,7 +68,8 @@ Options:
   --with-java       Deprecated alias for --add-java; does not install Java.
   --help            Show this help.
 
-Current implementation has Ubuntu, Debian, Fedora, Arch, RHEL, and conservative macOS backends. Other backend families are named but not implemented in v0.
+Implemented backends: ubuntu, debian, fedora, arch, rhel, alpine, macos.
+Planned backends: centos, suse.
 USAGE
 }
 
@@ -130,7 +135,7 @@ select_backend() {
 }
 
 require_supported_backend() {
-  if [[ "$BACKEND" == "ubuntu" || "$BACKEND" == "debian" || "$BACKEND" == "fedora" || "$BACKEND" == "arch" || "$BACKEND" == "rhel" || "$BACKEND" == "macos" ]]; then
+  if [[ "$BACKEND" == "ubuntu" || "$BACKEND" == "debian" || "$BACKEND" == "fedora" || "$BACKEND" == "arch" || "$BACKEND" == "rhel" || "$BACKEND" == "alpine" || "$BACKEND" == "macos" ]]; then
     return 0
   fi
 
@@ -139,7 +144,7 @@ require_supported_backend() {
     return 0
   fi
 
-  die "backend '$BACKEND' for ${OS_NAME} ${OS_VERSION_ID} is planned but not implemented in v0; implemented backends: ubuntu, debian, fedora, arch, rhel, macos; planned backends: $PLANNED_BACKENDS"
+  die "backend '$BACKEND' for ${OS_NAME} ${OS_VERSION_ID} is planned but not implemented in v0; implemented backends: $IMPLEMENTED_BACKENDS; planned backends: $PLANNED_BACKENDS"
 }
 
 parse_args() {
@@ -429,6 +434,36 @@ load_rhel_packages_from_tsv() {
   ((${#SELECTED_RHEL_DNF_PACKAGES[@]} > 0)) || die "no RHEL dnf packages selected for profile: $PROFILE"
 }
 
+load_alpine_packages_from_tsv() {
+  local package_profile logical_name apk_package command notes
+
+  [[ -r "$ALPINE_TSV" ]] || die "missing Alpine package map: $ALPINE_TSV"
+
+  SELECTED_APK_PACKAGES=()
+  SELECTED_COMMANDS=()
+
+  while IFS=$'\t' read -r package_profile logical_name apk_package command notes; do
+    [[ -z "${package_profile:-}" ]] && continue
+    [[ "$package_profile" == "profile" ]] && continue
+
+    if package_profile_selected "$package_profile"; then
+      if [[ -n "${apk_package:-}" ]]; then
+        if ((${#SELECTED_APK_PACKAGES[@]} == 0)) || ! array_contains "$apk_package" "${SELECTED_APK_PACKAGES[@]}"; then
+          SELECTED_APK_PACKAGES+=("$apk_package")
+        fi
+      fi
+
+      if [[ -n "${command:-}" ]]; then
+        if ((${#SELECTED_COMMANDS[@]} == 0)) || ! array_contains "$command" "${SELECTED_COMMANDS[@]}"; then
+          SELECTED_COMMANDS+=("$command")
+        fi
+      fi
+    fi
+  done < "$ALPINE_TSV"
+
+  ((${#SELECTED_APK_PACKAGES[@]} > 0)) || die "no Alpine apk packages selected for profile: $PROFILE"
+}
+
 load_package_map() {
   case "$BACKEND" in
     ubuntu)
@@ -449,7 +484,10 @@ load_package_map() {
     rhel)
       load_rhel_packages_from_tsv
       ;;
-    alpine|suse|centos)
+    alpine)
+      load_alpine_packages_from_tsv
+      ;;
+    suse|centos)
       load_ubuntu_packages_from_tsv
       ;;
     *)
@@ -723,6 +761,51 @@ install_arch_packages() {
   sudo pacman -S --needed --noconfirm "${AVAILABLE_PACMAN_PACKAGES[@]}"
 }
 
+ensure_apk() {
+  if command -v apk >/dev/null 2>&1; then
+    return 0
+  fi
+
+  die "apk is required for the Alpine backend, but apk was not found"
+}
+
+filter_available_alpine_packages() {
+  local package
+
+  AVAILABLE_APK_PACKAGES=()
+
+  log "checking Alpine package availability"
+
+  for package in "${SELECTED_APK_PACKAGES[@]}"; do
+    if apk search -e "$package" >/dev/null 2>&1; then
+      AVAILABLE_APK_PACKAGES+=("$package")
+    else
+      warn "skipping unavailable apk package: $package"
+    fi
+  done
+
+  ((${#AVAILABLE_APK_PACKAGES[@]} > 0)) || die "no available apk packages remained for profile: $PROFILE"
+}
+
+install_alpine_packages() {
+  log "selected profile: $PROFILE"
+  log "selected apk packages: ${SELECTED_APK_PACKAGES[*]}"
+
+  if (( DRY_RUN )); then
+    log "dry-run: sudo apk update"
+    log "dry-run: check apk availability for selected packages"
+    log "dry-run: sudo apk add ${SELECTED_APK_PACKAGES[*]}"
+    return 0
+  fi
+
+  ensure_apk
+  sudo apk update
+  filter_available_alpine_packages
+
+  log "available apk packages: ${AVAILABLE_APK_PACKAGES[*]}"
+  sudo apk add "${AVAILABLE_APK_PACKAGES[@]}"
+}
+
 install_packages() {
   case "$BACKEND" in
     ubuntu)
@@ -743,7 +826,10 @@ install_packages() {
     rhel)
       install_rhel_packages
       ;;
-    alpine|suse|centos)
+    alpine)
+      install_alpine_packages
+      ;;
+    suse|centos)
       if (( DRY_RUN )); then
         log "dry-run: backend '$BACKEND' is not implemented yet; Ubuntu package map is being shown as the current v0 plan"
         log "dry-run: selected profile: $PROFILE"
@@ -751,10 +837,10 @@ install_packages() {
         log "dry-run: stopping before local Ubuntu-specific user configuration actions on non-Ubuntu host"
         exit 0
       fi
-      die "backend '$BACKEND' is planned but not implemented yet; planned backends: $PLANNED_BACKENDS"
+      die "backend '$BACKEND' is planned but not implemented yet; implemented backends: $IMPLEMENTED_BACKENDS; planned backends: $PLANNED_BACKENDS"
       ;;
     *)
-      die "unknown backend for ${OS_NAME} ${OS_VERSION_ID}; planned backends: $PLANNED_BACKENDS"
+      die "unknown backend for ${OS_NAME} ${OS_VERSION_ID}; implemented backends: $IMPLEMENTED_BACKENDS; planned backends: $PLANNED_BACKENDS"
       ;;
   esac
 }
@@ -1011,6 +1097,10 @@ main() {
       setup_bash_qol
       ;;
     rhel)
+      setup_bashrc_loader
+      setup_bash_qol
+      ;;
+    alpine)
       setup_bashrc_loader
       setup_bash_qol
       ;;

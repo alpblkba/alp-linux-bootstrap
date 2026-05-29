@@ -4,7 +4,7 @@ This is my own bootstrap repository for setting up Linux and macOS machines.
 
 It installs packages, creates a small directory layout, adds conservative shell
 helpers, and keeps package lists split by platform. The current working backends
-are Ubuntu, Debian, Fedora, Arch, RHEL, and macOS. Other distributions are
+are Ubuntu, Debian, Fedora, Arch, RHEL, Alpine, and macOS. Other distributions are
 planned but not implemented yet.
 
 It is a setup script that should stay readable enough to review, edit, and run
@@ -19,6 +19,7 @@ again.
 - Fedora backend: dnf package install and bash setup.
 - Arch backend: pacman package install and bash setup.
 - RHEL backend: dnf package install and bash setup.
+- Alpine backend: apk package install and bash setup.
 - macOS backend: Homebrew package install, zsh setup, and conservative macOS
   defaults.
 - Other backends: named/planned stubs only.
@@ -75,6 +76,13 @@ RHEL:
 ./alp-linux-oneshot-bootstrap.sh --profile alp-heavy
 ```
 
+Alpine:
+
+```bash
+./alp-linux-oneshot-bootstrap.sh --dry-run
+./alp-linux-oneshot-bootstrap.sh --profile alp-heavy
+```
+
 Useful flags:
 
 - `--dry-run` - print what would happen.
@@ -93,6 +101,7 @@ Implemented now:
 - Fedora: real dnf install path.
 - Arch: real pacman install path using official repositories only.
 - RHEL: real dnf install path for RHEL-style repositories.
+- Alpine: real apk install path.
 - macOS: real Homebrew install path, assuming Homebrew is already installed.
 
 Backends are currently family-based, not version-specific.
@@ -107,9 +116,11 @@ installed in v0.
 RHEL support is repository-dependent. The script does not register RHEL systems,
 run `subscription-manager`, or enable EPEL in v0.
 
+Alpine support uses apk and does not enable edge repositories in v0. Package
+availability depends on enabled repositories and architecture.
+
 Planned backend families:
 
-- Alpine
 - CentOS
 - openSUSE/SUSE
 
@@ -217,4 +228,5 @@ Backups and stronger dry-run coverage are still future work.
 - `packages/fedora.tsv` - Fedora dnf package map.
 - `packages/arch.tsv` - Arch pacman package map.
 - `packages/rhel.tsv` - RHEL dnf package map.
+- `packages/alpine.tsv` - Alpine apk package map.
 - `packages/macos.tsv` - macOS Homebrew package map.
