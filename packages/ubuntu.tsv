@@ -1,5 +1,5 @@
 profile	logical_name	apt_package	command	notes
-core	ca-certificates	ca-certificates	ca-certificates	HTTPS trust store placeholder; no normal interactive command
+core	ca-certificates	ca-certificates	-	HTTPS trust store placeholder; no normal interactive command
 core	curl	curl	curl	HTTP client for installers and APIs
 core	wget	wget	wget	Simple file fetcher
 core	git	git	git	Version control baseline
@@ -40,8 +40,6 @@ dev-c	clang	clang	clang	LLVM C/C++ compiler
 dev-c	clang-format	clang-format	clang-format	C/C++ formatter
 dev-c	valgrind	valgrind	valgrind	Memory debugging
 rust	rustup	rustup	rustup	Rust toolchain installer when packaged
-rust	cargo	cargo	cargo	Rust package manager
-rust	rustc	rustc	rustc	Rust compiler
 go	golang-go	golang-go	go	Go compiler/toolchain
 zig	zig	zig	zig	Zig compiler when packaged; fallback installer may be needed on some Ubuntu versions
 python	python3	python3	python3	Python runtime

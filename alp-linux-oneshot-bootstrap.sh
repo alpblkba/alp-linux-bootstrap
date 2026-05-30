@@ -254,6 +254,19 @@ array_contains() {
   return 1
 }
 
+command_is_checkable() {
+  local command="${1:-}"
+
+  case "$command" in
+    ""|-|none|NONE)
+      return 1
+      ;;
+    *)
+      return 0
+      ;;
+  esac
+}
+
 load_ubuntu_packages_from_tsv() {
   local package_profile logical_name apt_package command notes
 
@@ -273,7 +286,7 @@ load_ubuntu_packages_from_tsv() {
         fi
       fi
 
-      if [[ -n "${command:-}" ]]; then
+      if command_is_checkable "${command:-}"; then
         if ((${#SELECTED_COMMANDS[@]} == 0)) || ! array_contains "$command" "${SELECTED_COMMANDS[@]}"; then
           SELECTED_COMMANDS+=("$command")
         fi
@@ -303,7 +316,7 @@ load_debian_packages_from_tsv() {
         fi
       fi
 
-      if [[ -n "${command:-}" ]]; then
+      if command_is_checkable "${command:-}"; then
         if ((${#SELECTED_COMMANDS[@]} == 0)) || ! array_contains "$command" "${SELECTED_COMMANDS[@]}"; then
           SELECTED_COMMANDS+=("$command")
         fi
@@ -333,7 +346,7 @@ load_macos_packages_from_tsv() {
         fi
       fi
 
-      if [[ -n "${command:-}" ]]; then
+      if command_is_checkable "${command:-}"; then
         if ((${#SELECTED_COMMANDS[@]} == 0)) || ! array_contains "$command" "${SELECTED_COMMANDS[@]}"; then
           SELECTED_COMMANDS+=("$command")
         fi
@@ -363,7 +376,7 @@ load_fedora_packages_from_tsv() {
         fi
       fi
 
-      if [[ -n "${command:-}" ]]; then
+      if command_is_checkable "${command:-}"; then
         if ((${#SELECTED_COMMANDS[@]} == 0)) || ! array_contains "$command" "${SELECTED_COMMANDS[@]}"; then
           SELECTED_COMMANDS+=("$command")
         fi
@@ -393,7 +406,7 @@ load_arch_packages_from_tsv() {
         fi
       fi
 
-      if [[ -n "${command:-}" ]]; then
+      if command_is_checkable "${command:-}"; then
         if ((${#SELECTED_COMMANDS[@]} == 0)) || ! array_contains "$command" "${SELECTED_COMMANDS[@]}"; then
           SELECTED_COMMANDS+=("$command")
         fi
@@ -423,7 +436,7 @@ load_rhel_packages_from_tsv() {
         fi
       fi
 
-      if [[ -n "${command:-}" ]]; then
+      if command_is_checkable "${command:-}"; then
         if ((${#SELECTED_COMMANDS[@]} == 0)) || ! array_contains "$command" "${SELECTED_COMMANDS[@]}"; then
           SELECTED_COMMANDS+=("$command")
         fi
@@ -453,7 +466,7 @@ load_alpine_packages_from_tsv() {
         fi
       fi
 
-      if [[ -n "${command:-}" ]]; then
+      if command_is_checkable "${command:-}"; then
         if ((${#SELECTED_COMMANDS[@]} == 0)) || ! array_contains "$command" "${SELECTED_COMMANDS[@]}"; then
           SELECTED_COMMANDS+=("$command")
         fi
