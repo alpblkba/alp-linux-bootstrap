@@ -56,6 +56,16 @@ die() {
   exit 1
 }
 
+run_privileged() {
+  if [[ "${EUID:-$(id -u)}" -eq 0 ]]; then
+    "$@"
+  elif command -v sudo >/dev/null 2>&1; then
+    sudo "$@"
+  else
+    die "root privileges required; run as root or install sudo"
+  fi
+}
+
 usage() {
   cat <<'USAGE'
 Usage: ./alp-linux-oneshot-bootstrap.sh [options]
@@ -136,11 +146,6 @@ select_backend() {
 
 require_supported_backend() {
   if [[ "$BACKEND" == "ubuntu" || "$BACKEND" == "debian" || "$BACKEND" == "fedora" || "$BACKEND" == "arch" || "$BACKEND" == "rhel" || "$BACKEND" == "alpine" || "$BACKEND" == "macos" ]]; then
-    return 0
-  fi
-
-  if (( DRY_RUN )); then
-    warn "dry-run on ${OS_NAME} ${OS_VERSION_ID}: backend '$BACKEND' is planned but not implemented; previewing Ubuntu-first package plan only"
     return 0
   fi
 
@@ -501,7 +506,7 @@ load_package_map() {
       load_alpine_packages_from_tsv
       ;;
     suse|centos)
-      load_ubuntu_packages_from_tsv
+      die "backend '$BACKEND' is planned but not implemented in v0; implemented backends: $IMPLEMENTED_BACKENDS; planned backends: $PLANNED_BACKENDS"
       ;;
     *)
       die "unknown backend for package loading: $BACKEND"
@@ -539,11 +544,11 @@ install_ubuntu_packages() {
     return 0
   fi
 
-  sudo apt update
+  run_privileged apt update
   filter_available_ubuntu_packages
 
   log "available apt packages: ${AVAILABLE_APT_PACKAGES[*]}"
-  sudo DEBIAN_FRONTEND=noninteractive apt install -y "${AVAILABLE_APT_PACKAGES[@]}"
+  run_privileged env DEBIAN_FRONTEND=noninteractive apt install -y "${AVAILABLE_APT_PACKAGES[@]}"
 }
 
 filter_available_debian_packages() {
@@ -575,11 +580,11 @@ install_debian_packages() {
     return 0
   fi
 
-  sudo apt update
+  run_privileged apt update
   filter_available_debian_packages
 
   log "available Debian apt packages: ${AVAILABLE_DEBIAN_APT_PACKAGES[*]}"
-  sudo DEBIAN_FRONTEND=noninteractive apt install -y "${AVAILABLE_DEBIAN_APT_PACKAGES[@]}"
+  run_privileged env DEBIAN_FRONTEND=noninteractive apt install -y "${AVAILABLE_DEBIAN_APT_PACKAGES[@]}"
 }
 
 ensure_homebrew() {
@@ -685,11 +690,11 @@ install_fedora_packages() {
   fi
 
   ensure_dnf
-  sudo dnf makecache
+  run_privileged dnf makecache
   filter_available_fedora_packages
 
   log "available dnf packages: ${AVAILABLE_DNF_PACKAGES[*]}"
-  sudo dnf install -y "${AVAILABLE_DNF_PACKAGES[@]}"
+  run_privileged dnf install -y "${AVAILABLE_DNF_PACKAGES[@]}"
 }
 
 filter_available_rhel_packages() {
@@ -722,11 +727,11 @@ install_rhel_packages() {
   fi
 
   ensure_dnf
-  sudo dnf makecache
+  run_privileged dnf makecache
   filter_available_rhel_packages
 
   log "available RHEL dnf packages: ${AVAILABLE_RHEL_DNF_PACKAGES[*]}"
-  sudo dnf install -y "${AVAILABLE_RHEL_DNF_PACKAGES[@]}"
+  run_privileged dnf install -y "${AVAILABLE_RHEL_DNF_PACKAGES[@]}"
 }
 
 ensure_pacman() {
@@ -767,11 +772,11 @@ install_arch_packages() {
   fi
 
   ensure_pacman
-  sudo pacman -Sy
+  run_privileged pacman -Sy
   filter_available_arch_packages
 
   log "available pacman packages: ${AVAILABLE_PACMAN_PACKAGES[*]}"
-  sudo pacman -S --needed --noconfirm "${AVAILABLE_PACMAN_PACKAGES[@]}"
+  run_privileged pacman -S --needed --noconfirm "${AVAILABLE_PACMAN_PACKAGES[@]}"
 }
 
 ensure_apk() {
@@ -812,11 +817,11 @@ install_alpine_packages() {
   fi
 
   ensure_apk
-  sudo apk update
+  run_privileged apk update
   filter_available_alpine_packages
 
   log "available apk packages: ${AVAILABLE_APK_PACKAGES[*]}"
-  sudo apk add "${AVAILABLE_APK_PACKAGES[@]}"
+  run_privileged apk add "${AVAILABLE_APK_PACKAGES[@]}"
 }
 
 install_packages() {
@@ -843,13 +848,6 @@ install_packages() {
       install_alpine_packages
       ;;
     suse|centos)
-      if (( DRY_RUN )); then
-        log "dry-run: backend '$BACKEND' is not implemented yet; Ubuntu package map is being shown as the current v0 plan"
-        log "dry-run: selected profile: $PROFILE"
-        log "dry-run: selected Ubuntu-first packages: ${SELECTED_APT_PACKAGES[*]}"
-        log "dry-run: stopping before local Ubuntu-specific user configuration actions on non-Ubuntu host"
-        exit 0
-      fi
       die "backend '$BACKEND' is planned but not implemented yet; implemented backends: $IMPLEMENTED_BACKENDS; planned backends: $PLANNED_BACKENDS"
       ;;
     *)
