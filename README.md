@@ -178,12 +178,22 @@ Planned profiles:
 profile. GUI/rice profiles are future work. Profile behavior is still
 simple and based on TSV package rows.
 
-## about Java
+## Java
 
 Java is not installed by default.
 
 Do not add Maven, Gradle, Spring, Kotlin, Selenium, or JVM-centered tooling to
 default package maps. Java support should stay explicit opt-in work later.
+
+## rust
+
+The default Rust path prefers rustup.
+
+On Ubuntu, the default package map avoids installing distro-managed cargo and
+rustc alongside rustup, because this caused apt conflicts during real
+Ubuntu ARM testing.
+
+A distro-managed Rust profile may be added later as an explicit choice.
 
 ## macOS notes
 
@@ -230,3 +240,43 @@ Backups and stronger dry-run coverage are still future work.
 - `packages/rhel.tsv` - RHEL dnf package map.
 - `packages/alpine.tsv` - Alpine apk package map.
 - `packages/macos.tsv` - macOS Homebrew package map.
+
+# optional Ubuntu workhorse scripts
+
+The scripts/ directory contains optional Ubuntu-specific helper scripts for
+post-bootstrap server work.
+
+These are not part of the default bootstrap path.
+
+scripts/finalize-ubuntu-workhorse.sh 
+- post-bootstrap Ubuntu server cleanup,
+package reinforcement, shell/session comfort, sysstat, chrony, plocate,
+unattended-upgrades, Docker sanity checks, and final system summaries.
+scripts/check-ubuntu-workhorse.sh 
+- read-only Ubuntu workhorse check for
+system resources, apt health, managed files, command coverage, Python,
+Docker, and common server tooling.
+
+## Tracelog
+
+The Git history is the source of truth; this is only a short project-shape log.
+
+### 2026-05-26
+
+Started the repository with an Ubuntu-first bootstrap skeleton, then shaped it into a backend-based script with early Ubuntu and macOS support.
+
+### 2026-05-27
+
+Added the first Linux backend set beyond Ubuntu: Fedora, Arch, RHEL, and Debian. Also simplified the README and kept local notes/tracelogs out of Git.
+
+### 2026-05-29
+
+Added Alpine support with apk, keeping it conservative: no edge repositories, no AUR-like helper path, and no GUI/rice defaults.
+
+### 2026-05-30
+
+Added optional Ubuntu workhorse helper scripts for post-bootstrap server cleanup, checks, and day-to-day machine readiness.
+
+### 2026-06-05
+
+Tightened runtime behavior after real-machine testing: root-or-sudo execution, package-only check placeholders, clearer unsupported-backend failure, and the Ubuntu Rust default centered on rustup.

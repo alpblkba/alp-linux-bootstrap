@@ -1,5 +1,5 @@
 profile	logical_name	apk_package	command	notes
-core	ca-certificates	ca-certificates	ca-certificates	HTTPS trust store placeholder; no normal interactive command
+core	ca-certificates	ca-certificates	-	HTTPS trust store placeholder; no normal interactive command
 core	bash	bash	bash	Bash shell required for this bootstrap script and bashrc.d setup
 core	bash-completion	bash-completion	bash-completion	Bash completion files when available
 core	curl	curl	curl	HTTP client
