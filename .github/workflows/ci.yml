@@ -24,8 +24,8 @@ jobs:
           chmod +x scripts/lint-tsv.sh
           ./scripts/lint-tsv.sh
 
-  validate-linux:
-    name: Validate (${{ matrix.distro }})
+  track-linux:
+    name: Track (${{ matrix.distro }})
     needs: lint
     runs-on: ubuntu-latest
     strategy:
@@ -34,34 +34,34 @@ jobs:
         include:
           - distro: arch
             image: archlinux:latest
-            setup: pacman -Syu --noconfirm bash grep gawk findutils
+            setup: pacman -Syu --noconfirm bash grep gawk findutils coreutils
           - distro: ubuntu
             image: ubuntu:24.04
             setup: |
               apt-get update
-              apt-get install -y bash grep gawk findutils software-properties-common
+              apt-get install -y bash grep gawk findutils coreutils software-properties-common
               add-apt-repository -y universe
               apt-get update
           - distro: debian
             image: debian:bookworm-slim
             setup: |
               apt-get update
-              apt-get install -y bash grep gawk findutils
+              apt-get install -y bash grep gawk findutils coreutils
               sed -i 's/main/main contrib non-free non-free-firmware/g' /etc/apt/sources.list.d/debian.sources || true
               apt-get update
           - distro: fedora
             image: fedora:latest
-            setup: dnf install -y bash grep gawk findutils
+            setup: dnf install -y bash grep gawk findutils coreutils
           - distro: rhel
             image: rockylinux:9
             setup: |
-              dnf install -y bash grep gawk findutils epel-release
+              dnf install -y bash grep gawk findutils coreutils epel-release
               dnf config-manager --set-enabled crb || true
           - distro: alpine
             image: alpine:latest
             setup: |
               apk update
-              apk add bash grep gawk findutils
+              apk add bash grep gawk findutils coreutils
               echo "http://dl-cdn.alpinelinux.org/alpine/edge/community" >> /etc/apk/repositories
               apk update
 
@@ -74,26 +74,44 @@ jobs:
       - name: Setup Prerequisites
         run: ${{ matrix.setup }}
 
-      - name: Verify Package Availability
+      - name: Track Package Versions
         run: |
-          chmod +x scripts/verify-packages.sh
-          ./scripts/verify-packages.sh ${{ matrix.distro }}
+          chmod +x scripts/track-updates.sh
+          ./scripts/track-updates.sh ${{ matrix.distro }}
 
-  validate-macos:
-    name: Validate (macos)
+      - name: Upload Lockfile and Summary
+        uses: actions/upload-artifact@v4
+        with:
+          name: result-${{ matrix.distro }}
+          path: |
+            packages/locks/${{ matrix.distro }}.lock
+            updates_${{ matrix.distro }}.txt
+          if-no-files-found: ignore
+
+  track-macos:
+    name: Track (macos)
     needs: lint
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Verify Homebrew Formulas
+      - name: Track Homebrew Formula Versions
         run: |
-          chmod +x scripts/verify-packages.sh
-          ./scripts/verify-packages.sh macos
+          chmod +x scripts/track-updates.sh
+          ./scripts/track-updates.sh macos
 
-  auto-sync-and-commit:
-    name: Sync Status & Auto-Commit
-    needs: [validate-linux, validate-macos]
+      - name: Upload Lockfile and Summary
+        uses: actions/upload-artifact@v4
+        with:
+          name: result-macos
+          path: |
+            packages/locks/macos.lock
+            updates_macos.txt
+          if-no-files-found: ignore
+
+  commit-sync:
+    name: Commit Package Updates
+    needs: [track-linux, track-macos]
     if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
     runs-on: ubuntu-latest
     steps:
@@ -101,19 +119,37 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Generate Status Matrix
-        run: |
-          chmod +x scripts/sync-status.sh
-          ./scripts/sync-status.sh
+      - name: Download Track Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts/
 
-      - name: Commit and Push Changes
+      - name: Assemble Commit Message
+        run: |
+          mkdir -p packages/locks
+          find artifacts/ -name "*.lock" -exec cp {} packages/locks/ \;
+
+          BODY_FILE="$(mktemp)"
+          find artifacts/ -name "updates_*.txt" -exec cat {} + >> "$BODY_FILE"
+
+          echo "COMMIT_BODY_PATH=$BODY_FILE" >> $GITHUB_ENV
+
+      - name: Commit and Push
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git add packages/STATUS.md
+
+          git add packages/locks/
+
           if git diff --staged --quiet; then
-            echo "no changes to commit."
-          else
-            git commit -m "chore(ci): auto-update package status matrix [skip ci]"
-            git push origin HEAD:${{ github.ref }}
+            echo "No package updates detected across distributions. Skipping commit."
+            exit 0
           fi
+
+          if [ -s "$COMMIT_BODY_PATH" ]; then
+            git commit -m "chore(ci): auto-update package status matrix [skip ci]" -F "$COMMIT_BODY_PATH"
+          else
+            git commit -m "chore(ci): initialize package version locks [skip ci]"
+          fi
+
+          git push origin HEAD:${{ github.ref }}

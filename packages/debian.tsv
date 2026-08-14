@@ -1,5 +1,5 @@
 profile	logical_name	apt_package	command	notes
-core	ca-certificates	ca-certificates	ca-certificates	HTTPS trust store placeholder; no normal interactive command
+core	ca-certificates	ca-certificates	-	HTTPS trust store placeholder; no normal interactive command
 core	curl	curl	curl	HTTP client
 core	wget	wget	wget	Simple file fetcher
 core	git	git	git	Version control baseline
