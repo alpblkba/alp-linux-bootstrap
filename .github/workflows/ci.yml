@@ -51,11 +51,11 @@ jobs:
               apt-get update
           - distro: fedora
             image: fedora:latest
-            setup: dnf install -y bash grep gawk findutils coreutils
+            setup: dnf install -y --allowerasing bash grep gawk findutils coreutils
           - distro: rhel
             image: rockylinux:9
             setup: |
-              dnf install -y bash grep gawk findutils coreutils epel-release
+              dnf install -y --allowerasing bash grep gawk findutils epel-release
               dnf config-manager --set-enabled crb || true
           - distro: alpine
             image: alpine:latest
@@ -118,6 +118,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
 
       - name: Download Track Artifacts
         uses: actions/download-artifact@v4
@@ -152,4 +153,5 @@ jobs:
             git commit -m "chore(ci): initialize package version locks [skip ci]"
           fi
 
+          git pull --rebase origin ${{ github.ref_name }}
           git push origin HEAD:${{ github.ref }}
