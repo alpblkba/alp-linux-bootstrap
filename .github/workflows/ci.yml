@@ -133,7 +133,16 @@ jobs:
           BODY_FILE="$(mktemp)"
           find artifacts/ -name "updates_*.txt" -exec cat {} + >> "$BODY_FILE"
 
-          echo "COMMIT_BODY_PATH=$BODY_FILE" >> $GITHUB_ENV
+          MSG_FILE="$(mktemp)"
+          if [ -s "$BODY_FILE" ]; then
+            echo "chore(ci): auto-update package status matrix [skip ci]" > "$MSG_FILE"
+            echo "" >> "$MSG_FILE"
+            cat "$BODY_FILE" >> "$MSG_FILE"
+          else
+            echo "chore(ci): initialize package version locks [skip ci]" > "$MSG_FILE"
+          fi
+
+          echo "COMMIT_MSG_PATH=$MSG_FILE" >> $GITHUB_ENV
 
       - name: Commit and Push
         run: |
@@ -147,11 +156,6 @@ jobs:
             exit 0
           fi
 
-          if [ -s "$COMMIT_BODY_PATH" ]; then
-            git commit -m "chore(ci): auto-update package status matrix [skip ci]" -F "$COMMIT_BODY_PATH"
-          else
-            git commit -m "chore(ci): initialize package version locks [skip ci]"
-          fi
-
+          git commit -F "$COMMIT_MSG_PATH"
           git pull --rebase origin ${{ github.ref_name }}
           git push origin HEAD:${{ github.ref }}
