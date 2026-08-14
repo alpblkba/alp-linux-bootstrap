@@ -9,6 +9,9 @@ on:
     - cron: '0 4 * * *'
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   lint:
     name: Lint TSV Formats
@@ -87,3 +90,30 @@ jobs:
         run: |
           chmod +x scripts/verify-packages.sh
           ./scripts/verify-packages.sh macos
+
+  auto-sync-and-commit:
+    name: Sync Status & Auto-Commit
+    needs: [validate-linux, validate-macos]
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Generate Status Matrix
+        run: |
+          chmod +x scripts/sync-status.sh
+          ./scripts/sync-status.sh
+
+      - name: Commit and Push Changes
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add packages/STATUS.md
+          if git diff --staged --quiet; then
+            echo "no changes to commit."
+          else
+            git commit -m "chore(ci): auto-update package status matrix [skip ci]"
+            git push origin HEAD:${{ github.ref }}
+          fi
