@@ -17,7 +17,6 @@ mkdir -p "$LOCK_DIR"
 touch "$LOCK_FILE"
 rm -f "$OUTPUT_FILE"
 
-# determine OS release name for the commit header
 RELEASE_INFO=""
 case "$DISTRO" in
     arch)
@@ -77,7 +76,7 @@ while IFS=$'\t' read -r col1 col2 col3 col4 || [ -n "$col1" ]; do
             CURRENT_VER="$(dnf info -q "$PACKAGE" 2>/dev/null | awk '/Version/{v=$3} /Release/{r=$3} END{if(v) print v"-"r}' || true)"
             ;;
         alpine)
-            CURRENT_VER="$(apk policy "$PACKAGE" 2>/dev/null | awk -F', ' '/lib/ || /http/ {next} {for(i=1;i<=NF;i++) if($i ~ /^[0-9]/) {print $i; exit}}' || true)"
+            CURRENT_VER="$(apk policy "$PACKAGE" 2>/dev/null | awk '/:[ ]*$/ && !/policy:/{gsub(/[ :]/, ""); print; exit}' || true)"
             ;;
         macos)
             CURRENT_VER="$(brew info --json=v2 "$PACKAGE" 2>/dev/null | grep -oP '(?<="version":")[^"]*' | head -n1 || true)"
@@ -88,7 +87,6 @@ while IFS=$'\t' read -r col1 col2 col3 col4 || [ -n "$col1" ]; do
 
     echo "${PACKAGE}=${CURRENT_VER}" >> "$TEMP_LOCK"
 
-    # compare with existing lock file
     OLD_VER="$(grep "^${PACKAGE}=" "$LOCK_FILE" 2>/dev/null | cut -d'=' -f2- || true)"
 
     if [ -n "$OLD_VER" ] && [ "$OLD_VER" != "$CURRENT_VER" ] && [ "$OLD_VER" != "unknown" ]; then
@@ -96,7 +94,6 @@ while IFS=$'\t' read -r col1 col2 col3 col4 || [ -n "$col1" ]; do
     fi
 done < "$TSV_FILE"
 
-# if changes were recorded, construct the distribution change block
 if [ -s "$CHANGES_BUFFER" ]; then
     echo "${DISTRO} ${RELEASE_INFO}:" > "$OUTPUT_FILE"
     cat "$CHANGES_BUFFER" >> "$OUTPUT_FILE"
