@@ -1,0 +1,89 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  schedule:
+    - cron: '0 4 * * *'
+  workflow_dispatch:
+
+jobs:
+  lint:
+    name: Lint TSV Formats
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run TSV Linter
+        run: |
+          chmod +x scripts/lint-tsv.sh
+          ./scripts/lint-tsv.sh
+
+  validate-linux:
+    name: Validate (${{ matrix.distro }})
+    needs: lint
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - distro: arch
+            image: archlinux:latest
+            setup: pacman -Syu --noconfirm bash grep gawk findutils
+          - distro: ubuntu
+            image: ubuntu:24.04
+            setup: |
+              apt-get update
+              apt-get install -y bash grep gawk findutils software-properties-common
+              add-apt-repository -y universe
+              apt-get update
+          - distro: debian
+            image: debian:bookworm-slim
+            setup: |
+              apt-get update
+              apt-get install -y bash grep gawk findutils
+              sed -i 's/main/main contrib non-free non-free-firmware/g' /etc/apt/sources.list.d/debian.sources || true
+              apt-get update
+          - distro: fedora
+            image: fedora:latest
+            setup: dnf install -y bash grep gawk findutils
+          - distro: rhel
+            image: rockylinux:9
+            setup: |
+              dnf install -y bash grep gawk findutils epel-release
+              dnf config-manager --set-enabled crb || true
+          - distro: alpine
+            image: alpine:latest
+            setup: |
+              apk update
+              apk add bash grep gawk findutils
+              echo "http://dl-cdn.alpinelinux.org/alpine/edge/community" >> /etc/apk/repositories
+              apk update
+
+    container:
+      image: ${{ matrix.image }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Prerequisites
+        run: ${{ matrix.setup }}
+
+      - name: Verify Package Availability
+        run: |
+          chmod +x scripts/verify-packages.sh
+          ./scripts/verify-packages.sh ${{ matrix.distro }}
+
+  validate-macos:
+    name: Validate (macos)
+    needs: lint
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify Homebrew Formulas
+        run: |
+          chmod +x scripts/verify-packages.sh
+          ./scripts/verify-packages.sh macos
