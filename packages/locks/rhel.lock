@@ -1,5 +1,5 @@
 ca-certificates=2025.2.80_v9.0.305-91.el9
-curl=7.76.1-40.el9
+curl=7.76.1-40.el9_8.5
 wget=1.21.1-8.el9_4
 git=Fast-1.el9
 gnupg2=2.3.3-5.el9_7
@@ -21,7 +21,7 @@ vim-enhanced=8.2.2637-26.el9_8.13
 acl=2.4.0-1.el9_8
 logrotate=3.18.0-12.el9
 lsof=4.94.0-3.el9
-ripgrep=14.1.1-1.el9
+ripgrep=15.2.0-1.el9
 fd-find=10.4.2-4.el9
 bat=0.26.1-2.el9
 fzf=0.58.0-2.el9
