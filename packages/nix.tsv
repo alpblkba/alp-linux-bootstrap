@@ -1,0 +1,94 @@
+profile	logical_name	nix_package	command	notes
+core	cacert	cacert	-	HTTPS trust store placeholder; no normal interactive command
+core	bash	bash	bash	Bash shell used by this bootstrap and the bashrc.d loader
+core	bash-completion	bash-completion	-	Bash completion files; no interactive command of its own
+core	curl	curl	curl	HTTP client
+core	wget	wget	wget	Simple file fetcher
+core	git	git	git	Version control baseline
+core	gnupg	gnupg	gpg	Package signing and key management
+core	unzip	unzip	unzip	Archive extraction
+core	zip	zip	zip	Archive creation
+core	tar	gnutar	tar	GNU tar; the nixpkgs attribute is gnutar
+core	gzip	gzip	gzip	Gzip compression utilities
+core	xz	xz	xz	XZ compression utilities
+core	zstd	zstd	zstd	Zstandard compression utilities
+core	rsync	rsync	rsync	File synchronization
+core	openssh	openssh	ssh	SSH client and server binaries in one attribute
+core	htop	htop	htop	Interactive process viewer
+core	tmux	tmux	tmux	Terminal multiplexer
+core	tree	tree	tree	Directory tree viewer
+core	jq	jq	jq	JSON processor
+core	yq	yq-go	yq	YAML processor; nixpkgs ships the Go implementation as yq-go
+core	shellcheck	shellcheck	shellcheck	Shell script linter
+core	shfmt	shfmt	shfmt	Shell formatter
+core	coreutils	coreutils	realpath	GNU coreutils; may collide with util-linux on kill and friends
+core	util-linux	util-linux	lsblk	Useful Linux utilities beyond coreutils
+core	less	less	less	Pager
+server	openssh	openssh	sshd	SSH daemon; NixOS normally enables it through services.openssh
+server	vim	vim	vim	Terminal editor
+server	neovim	neovim	nvim	Modern terminal editor
+server	acl	acl	getfacl	POSIX ACL tooling
+server	logrotate	logrotate	logrotate	Log rotation
+server	lsof	lsof	lsof	Open files/process inspection
+server	procps	procps	ps	Process utilities; may collide with util-linux on kill
+terminal-ux	ripgrep	ripgrep	rg	Fast recursive search
+terminal-ux	fd	fd	fd	Fast find alternative
+terminal-ux	bat	bat	bat	Cat with syntax highlighting
+terminal-ux	fzf	fzf	fzf	Fuzzy finder
+terminal-ux	zoxide	zoxide	zoxide	Smart directory jumping
+terminal-ux	direnv	direnv	direnv	Per-directory environment loader
+terminal-ux	starship	starship	starship	Cross-shell prompt
+terminal-ux	zellij	zellij	zellij	Terminal workspace manager
+terminal-ux	btop	btop	btop	Resource monitor
+terminal-ux	eza	eza	eza	Modern ls replacement
+dev-c	gcc	gcc	gcc	C/C++ compiler; may collide with clang on cc and c++
+dev-c	make	gnumake	make	Build tool; the nixpkgs attribute is gnumake
+dev-c	binutils	binutils	ld	Linker and binary utilities
+dev-c	cmake	cmake	cmake	C/C++ build system
+dev-c	ninja	ninja	ninja	Fast build backend
+dev-c	meson	meson	meson	Build system
+dev-c	pkg-config	pkg-config	pkg-config	Build metadata helper
+dev-c	gdb	gdb	gdb	GNU debugger
+dev-c	lldb	lldb	lldb	LLVM debugger
+dev-c	clang	clang	clang	LLVM C/C++ compiler
+dev-c	clang-format	clang-tools	clang-format	Clang tooling including clang-format and clangd
+dev-c	valgrind	valgrind	valgrind	Memory debugging
+rust	rustup	rustup	rustup	Rust toolchain installer; cargo and rustc come from rustup, not from separate attributes
+go	go	go	go	Go compiler/toolchain
+zig	zig	zig	zig	Zig compiler
+python	python3	python3	python3	Python runtime
+python	pipx	pipx	pipx	Isolated Python CLI installs
+python	virtualenv	virtualenv	virtualenv	Python virtualenv helper
+python	uv	uv	uv	Fast Python package manager; nixpkgs discourages a profile-wide pip
+containers	docker	docker	docker	Docker engine and CLI; NixOS enables the daemon through virtualisation.docker
+containers	docker-compose	docker-compose	docker-compose	Docker Compose
+containers	podman	podman	podman	Rootless container engine
+containers	buildah	buildah	buildah	OCI image builder
+containers	skopeo	skopeo	skopeo	Container image copy/inspect
+networking	bind-tools	dnsutils	dig	DNS query tools
+networking	net-tools	net-tools	netstat	Legacy network tools
+networking	iproute2	iproute2	ip	Modern network tools
+networking	traceroute	traceroute	traceroute	Route tracing
+networking	mtr	mtr	mtr	Network path diagnostics
+networking	nmap	nmap	nmap	Network discovery
+networking	tcpdump	tcpdump	tcpdump	Packet capture
+networking	whois	whois	whois	WHOIS lookup
+networking	socat	socat	socat	Socket relay/debug tool
+networking	netcat-openbsd	netcat-openbsd	nc	Netcat implementation
+networking	iperf3	iperf3	iperf3	Network performance testing
+security-lite	nftables	nftables	nft	Packet filtering; nixpkgs has no ufw and NixOS firewalls declaratively
+security-lite	fail2ban	fail2ban	fail2ban-client	Basic brute-force protection
+security-lite	age	age	age	File encryption
+security-lite	pass	pass	pass	Unix password manager
+security-lite	openssh	openssh	ssh	SSH client security baseline
+debugging	strace	strace	strace	System call tracer
+debugging	ltrace	ltrace	ltrace	Library call tracer
+debugging	perf	linuxPackages.perf	perf	Performance tooling; nixpkgs keeps perf inside the kernel package set
+debugging	bpftrace	bpftrace	bpftrace	eBPF tracing
+debugging	sysstat	sysstat	iostat	System performance stats
+debugging	lsof	lsof	lsof	Open files/process inspection
+embedded-lite	avrdude	avrdude	avrdude	AVR flashing tool
+embedded-lite	openocd	openocd	openocd	On-chip debugger
+embedded-lite	gcc-arm-embedded	gcc-arm-embedded	arm-none-eabi-gcc	ARM embedded GCC and GDB toolchain
+embedded-lite	dfu-util	dfu-util	dfu-util	USB DFU firmware flashing
+embedded-lite	picocom	picocom	picocom	Minimal serial terminal

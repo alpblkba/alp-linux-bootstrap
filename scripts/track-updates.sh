@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+SCRIPT_DIR="$(cd -- "$(dirname -- "$0")" && pwd)"
+
 DISTRO="${1:-}"
 
 if [ -z "$DISTRO" ]; then
@@ -31,10 +33,24 @@ case "$DISTRO" in
     alpine)
         RELEASE_INFO="$(cut -d. -f1,2 /etc/alpine-release 2>/dev/null || echo 'edge')"
         ;;
+    nix)
+        RELEASE_INFO="$( { nix-instantiate --eval --expr '(import <nixpkgs> { }).lib.version' 2>/dev/null || true; } | tr -d '"')"
+        [ -z "$RELEASE_INFO" ] && RELEASE_INFO="unknown"
+        ;;
     macos)
         RELEASE_INFO="$(sw_vers -productVersion 2>/dev/null || echo 'darwin')"
         ;;
 esac
+
+# One nixpkgs evaluation resolves every attribute to a version; the per-package
+# loop below only reads the result.
+NIX_VERSIONS=""
+if [ "$DISTRO" = "nix" ]; then
+    NIX_VERSIONS="$(mktemp)"
+    trap 'rm -f "$NIX_VERSIONS"' EXIT
+    awk -F'\t' 'NR > 1 && NF >= 3 { print $3 }' "$TSV_FILE" \
+        | "$SCRIPT_DIR/nix-query.sh" > "$NIX_VERSIONS"
+fi
 
 TEMP_LOCK="$(mktemp)"
 CHANGES_BUFFER="$(mktemp)"
@@ -78,6 +94,9 @@ while IFS=$'\t' read -r col1 col2 col3 col4 || [ -n "$col1" ]; do
         alpine)
             CURRENT_VER="$(apk policy "$PACKAGE" 2>/dev/null | awk '/:[ ]*$/ && !/policy:/{gsub(/[ :]/, ""); print; exit}' || true)"
             ;;
+        nix)
+            CURRENT_VER="$(awk -F'=' -v p="$PACKAGE" '$1 == p { sub(/^[^=]*=/, ""); print; exit }' "$NIX_VERSIONS")"
+            ;;
         macos)
             CURRENT_VER="$(brew info --json=v2 "$PACKAGE" 2>/dev/null | grep -oP '(?<="version":")[^"]*' | head -n1 || true)"
             ;;
@@ -87,7 +106,9 @@ while IFS=$'\t' read -r col1 col2 col3 col4 || [ -n "$col1" ]; do
 
     echo "${PACKAGE}=${CURRENT_VER}" >> "$TEMP_LOCK"
 
-    OLD_VER="$(grep "^${PACKAGE}=" "$LOCK_FILE" 2>/dev/null | cut -d'=' -f2- || true)"
+    # Literal compare: attribute names carry dots (linuxPackages.perf) and
+    # package names carry regex metacharacters (docker.io, g++).
+    OLD_VER="$(awk -F'=' -v p="$PACKAGE" '$1 == p { sub(/^[^=]*=/, ""); print; exit }' "$LOCK_FILE")"
 
     if [ -n "$OLD_VER" ] && [ "$OLD_VER" != "$CURRENT_VER" ] && [ "$OLD_VER" != "unknown" ]; then
         echo "${PACKAGE} ${OLD_VER} replaced with: ${CURRENT_VER}" >> "$CHANGES_BUFFER"

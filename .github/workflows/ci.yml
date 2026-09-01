@@ -24,6 +24,11 @@ jobs:
           chmod +x scripts/lint-tsv.sh
           ./scripts/lint-tsv.sh
 
+      - name: Check Profile Consistency
+        run: |
+          chmod +x scripts/check-profiles.sh
+          ./scripts/check-profiles.sh
+
   track-linux:
     name: Track (${{ matrix.distro }})
     needs: lint
@@ -88,6 +93,45 @@ jobs:
             updates_${{ matrix.distro }}.txt
           if-no-files-found: ignore
 
+  track-nix:
+    name: Track (nix)
+    needs: lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Nix
+        run: |
+          curl -fsSL https://nixos.org/nix/install -o /tmp/nix-install.sh
+          sh /tmp/nix-install.sh --no-daemon --no-channel-add
+          echo "$HOME/.nix-profile/bin" >> "$GITHUB_PATH"
+
+      - name: Pin nixpkgs Channel
+        run: |
+          CHANNEL="$(awk -F'\t' '$4 == "current" { print $3; exit }' packages/meta/nix-releases.tsv)"
+          if [ -z "$CHANNEL" ]; then
+            echo "error: no release marked 'current' in packages/meta/nix-releases.tsv"
+            exit 1
+          fi
+          echo "tracking nixpkgs channel: $CHANNEL"
+          nix-channel --add "https://nixos.org/channels/${CHANNEL}" nixpkgs
+          nix-channel --update
+          echo "NIX_PATH=$HOME/.nix-defexpr/channels" >> "$GITHUB_ENV"
+
+      - name: Track nixpkgs Attribute Versions
+        run: |
+          chmod +x scripts/track-updates.sh scripts/nix-query.sh
+          ./scripts/track-updates.sh nix
+
+      - name: Upload Lockfile and Summary
+        uses: actions/upload-artifact@v4
+        with:
+          name: result-nix
+          path: |
+            packages/locks/nix.lock
+            updates_nix.txt
+          if-no-files-found: ignore
+
   track-macos:
     name: Track (macos)
     needs: lint
@@ -111,7 +155,7 @@ jobs:
 
   commit-sync:
     name: Commit Package Updates
-    needs: [track-linux, track-macos]
+    needs: [track-linux, track-nix, track-macos]
     if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
     runs-on: ubuntu-latest
     steps:

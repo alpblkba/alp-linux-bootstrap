@@ -10,13 +10,13 @@ Package definitions are maintained in TSV files under packages/ to separate data
 Run the single-stage bootstrap script directly on a fresh machine:
 
 ```bash
-sh -c "$(curl -fsSL [https://raw.githubusercontent.com/alpblkba/alp-linux-bootstrap/main/alp-linux-oneshot-bootstrap.sh](https://raw.githubusercontent.com/alpblkba/alp-linux-bootstrap/main/alp-linux-oneshot-bootstrap.sh))"
+sh -c "$(curl -fsSL https://raw.githubusercontent.com/alpblkba/alp-linux-bootstrap/main/alp-linux-oneshot-bootstrap.sh)"
 ```
 
 To inspect package manifests and modify selections before applying:
 
 ```
-git clone [https://github.com/alpblkba/alp-linux-bootstrap.git](https://github.com/alpblkba/alp-linux-bootstrap.git) ~/.alp-bootstrap
+git clone https://github.com/alpblkba/alp-linux-bootstrap.git ~/.alp-bootstrap
 cd ~/.alp-bootstrap
 ./alp-linux-oneshot-bootstrap.sh
 ```
@@ -31,11 +31,12 @@ The automated CI matrix and bootstrap definitions currently verify and support t
 - **Fedora**: Latest stable release (`fedora:latest`)
 - **RHEL / Enterprise Linux**: EL 9 ecosystem (`rockylinux:9` with EPEL and CRB enabled)
 - **Alpine Linux**: Latest stable (`alpine:latest` with edge community repository)
+- **Nix / NixOS**: 26.05 Yarara down to 24.11 Vicuna, plus `nixos-unstable`
 - **macOS**: Latest stable (`macos-latest` runner via Homebrew)
 
  Package manifests are located in `packages/<distro>.tsv` and version lock states are synchronized daily in `packages/locks/<distro>.lock`.
 
-Backends are currently family-based, not version-specific.
+Backends are family-based rather than version-specific, with Nix as the one exception.
 
 Debian and Ubuntu both use apt, but they have separate package maps. Debian-family systems use compatibility symlinks for fd and bat command names where needed.
 
@@ -44,6 +45,8 @@ Arch support does not include AUR helpers. No yay, paru, or AUR packages are ins
 RHEL support is repository-dependent. The script does not register RHEL systems, run subscription-manager, or enable EPEL in v0.
 
 Alpine support uses apk and does not enable edge repositories in v0. Package availability depends on enabled repositories and architecture.
+
+Nix is the one version-aware backend. It reads the release table in `packages/meta/nix-releases.tsv`, matches the detected NixOS release, and refuses anything older than the floor listed there.
 
 ### Planned backend families:
 
@@ -58,6 +61,7 @@ Alpine support uses apk and does not enable edge repositories in v0. Package ava
     Fedora 40+
     Arch rolling/recent
     Alpine latest 1-2
+    NixOS current and recent releases, plus nixos-unstable
     RHEL 7/8/9
     CentOS 7/8
     openSUSE/SUSE latest, initially openSUSE Tumbleweed
@@ -67,7 +71,7 @@ WSL support should be enough to avoid breaking, not a separate WSL-first setup.
 
 ## Profiles
 
-The default profile is `alp-heavy`.
+The default profile is `alp-base`.
 
 Implemented package groups:
 
@@ -85,11 +89,18 @@ Implemented package groups:
 - `debugging`
 - `embedded-lite`
 
-#### Synthetic profile:
+#### Synthetic profiles:
 
-- `alp-heavy` = `core` + `server` + `terminal-ux` + `dev-c` + `rust` + `go` +
-  `zig` + `python` + `containers` + `networking` + `security-lite` +
-  `debugging` + `embedded-lite`
+- `alp-base` = `core` + `server` + `terminal-ux`. The default. Small enough for a
+  fresh server, big enough to actually work in: shell tooling, git, archives,
+  ssh, an editor, and the terminal-UX set.
+- `alp-heavy` = every group above.
+
+Any single group name is also a valid profile and is installed on top of
+`alp-base`, so `--profile rust` means `core` + `server` + `terminal-ux` + `rust`.
+An unknown `--profile` value is now an error instead of a silent fallback.
+
+The `server` group is skipped on macOS; the macOS package map does not define it.
 
 #### Planned profiles:
 
@@ -101,6 +112,54 @@ Implemented package groups:
 - `memory-debugging`
 
 `alp-heavy` is the broader and more professional setup. GUI/rice profiles are future work. Profile behavior is still simple and based on TSV package rows.
+
+`scripts/check-profiles.sh` asserts that every package map carries the same
+group set with the same column shape, so the profiles stay comparable across
+backends.
+
+
+## Nix
+
+The Nix backend triggers on `ID=nixos` in `/etc/os-release`. Packages are
+nixpkgs attribute paths in `packages/nix.tsv`, including dotted ones such as
+`linuxPackages.perf`.
+
+Supported releases live in `packages/meta/nix-releases.tsv`:
+
+| Release | Codename | Channel | Status |
+| :--- | :--- | :--- | :--- |
+| unstable | Zokor | `nixos-unstable` | rolling |
+| 26.05 | Yarara | `nixos-26.05` | current |
+| 25.11 | Xantusia | `nixos-25.11` | supported |
+| 25.05 | Warbler | `nixos-25.05` | legacy |
+| 24.11 | Vicuna | `nixos-24.11` | legacy |
+
+The script reads `VERSION_ID`, takes the release series from it, and looks it up
+in that table. `legacy` releases warn and continue. A release newer than
+`current` is treated as unstable. A release older than the floor is a hard
+error. That table is also the single source of truth for the channel CI pins,
+so adding the next release means editing one file.
+
+Installs go through `nix-env -f '<nixpkgs>' -iA`, against the machine's own
+channel. This is imperative and not the declarative NixOS way; `configuration.nix`
+and home-manager remain the right answer for a real NixOS setup. The backend
+exists so a fresh NixOS box gets the same tool set as every other target.
+
+Two Nix-specific behaviors:
+
+- Attribute availability is resolved in a single `nix-instantiate --eval` pass
+  over the whole selection, so an attribute that a given release does not carry
+  is dropped instead of failing the run.
+- `nix-env` aborts a whole batch on one file collision (`coreutils` vs
+  `util-linux`, `gcc` vs `clang`). The install falls back to one attribute at a
+  time and reports what did not apply.
+
+nixpkgs has no `ufw`, so `security-lite` uses `nftables`; NixOS firewalls
+declaratively anyway. The `rust` group is `rustup` only, because `rustup`,
+`cargo`, and `rustc` collide in a single profile.
+
+Nix on a non-NixOS distribution is not wired up yet. The manifest is plain
+nixpkgs attributes, so it is a detection change, not a data change.
 
 
 ## about Java
@@ -162,6 +221,8 @@ Backups and stronger dry-run coverage are still future work.
 - `packages/arch.tsv` - Arch pacman package map.
 - `packages/rhel.tsv` - RHEL dnf package map.
 - `packages/alpine.tsv` - Alpine apk package map.
+- `packages/nix.tsv` - nixpkgs attribute map.
+- `packages/meta/nix-releases.tsv` - supported Nix releases, codenames, and channels.
 - `packages/macos.tsv` - macOS Homebrew package map.
 
 ### optional Ubuntu workhorse scripts
@@ -184,6 +245,7 @@ scripts/check-ubuntu-workhorse.sh
 - Arch: pacman package install and bash setup.
 - RHEL: dnf package install and bash setup.
 - Alpine: apk package install and bash setup.
+- Nix: release detection against the supported-release table, nixpkgs attribute install through nix-env, and bash setup.
 - macOS: Homebrew package install, zsh setup, and conservative macOS defaults.
 - Other backends: named/planned stubs only.
 - GUI/rice options: not in the default path.
@@ -200,12 +262,16 @@ Package maps are also early. Some apt, dnf, pacman, and Homebrew packages may be
 ├── packages
 │   ├── STATUS.md                   # Package count and placeholder status table
 │   ├── <distro>.tsv                # Tab-separated package manifests per platform
+│   ├── meta
+│   │   └── nix-releases.tsv        # Supported Nix releases, codenames, channels
 │   └── locks
 │       └── <distro>.lock           # Synchronized upstream package versions
 ├── scripts
 │   ├── lint-tsv.sh                 # Validates TSV file format and separators
+│   ├── check-profiles.sh           # Asserts identical profile groups and column shape
 │   ├── verify-packages.sh          # Checks package availability in distribution repositories
 │   ├── track-updates.sh            # Queries repository versions and generates lockfiles
+│   ├── nix-query.sh                # Resolves nixpkgs attributes to versions in one evaluation
 │   └── sync-status.sh              # Updates STATUS.md overview matrix
 └── tracelog                        # Historical notes and implementation records
 ```
@@ -214,10 +280,15 @@ Package maps are also early. Some apt, dnf, pacman, and Homebrew packages may be
 
 ### Manifest format
 
-- **category**: Group name used during installation (base, development, tools, network, security).
+Every `packages/<target>.tsv` has the same five tab-separated columns:
+
+- **profile**: Package group used during installation (`core`, `server`, `terminal-ux`, `dev-c`, `rust`, `go`, `zig`, `python`, `containers`, `networking`, `security-lite`, `debugging`, `embedded-lite`).
 - **logical_name**: Generic name of the tool across all operating systems.
-- **package**: Distribution specific package manager name. Placeholders (-, none, custom, builtin) indicate tools installed outside standard package managers.
-- **description**: Plain text summary of the package.
+- **<manager>_package**: Package manager name for that target (`apt_package`, `dnf_package`, `pacman_package`, `apk_package`, `nix_package`, `brew_package`). For Nix this is a nixpkgs attribute path and may be dotted.
+- **command**: Command the tool provides, or `-` when it provides none. Used to generate the post-install check script.
+- **notes**: Plain text summary and target-specific caveats.
+
+`packages/meta/nix-releases.tsv` is not a package map; it uses `release`, `codename`, `channel`, `status`, `notes`.
 
 
 ## Automated CI and version tracking
@@ -226,7 +297,9 @@ The repository uses GitHub Actions to validate package availability and track ve
 
 - scripts/lint-tsv.sh validates that all manifest files use tab characters instead of spaces and contain non-empty field definitions.
 
-- Container matrix jobs launch isolated environments for Arch, Ubuntu, Debian, Fedora, RHEL (Rocky Linux 9), Alpine, and macOS runners.
+- scripts/check-profiles.sh asserts that every package map uses the same column shape and carries the same profile groups, with macOS exempt from `server`.
+
+- Container matrix jobs launch isolated environments for Arch, Ubuntu, Debian, Fedora, RHEL (Rocky Linux 9), and Alpine, plus a macOS runner and a Nix job that installs Nix and pins the channel marked `current` in `packages/meta/nix-releases.tsv`.
 
 - scripts/verify-packages.sh queries the native package managers to confirm that listed packages exist in upstream repositories.
 
@@ -260,3 +333,6 @@ Added GitHub Actions container matrix and TSV linter (`scripts/lint-tsv.sh`, `sc
 
 #### 2026-08-15
 Added version tracking (`scripts/track-updates.sh`), lockfile management, and automated sync commits.
+
+#### 2026-09-01
+Added the Nix backend with a version-aware release table (26.05 Yarara down to 24.11 Vicuna), moved the default profile from `alp-heavy` to `alp-base`, made unknown profiles a hard error, and added `scripts/check-profiles.sh` to keep every package map on the same group set.

@@ -3,7 +3,7 @@ set -euo pipefail
 
 EXIT_CODE=0
 
-mapfile -t TSV_FILES < <(find packages -maxdepth 1 -name "*.tsv" 2>/dev/null)
+mapfile -t TSV_FILES < <(find packages -name "*.tsv" 2>/dev/null | sort)
 
 if [ ${#TSV_FILES[@]} -eq 0 ]; then
     echo "error: no tsv files found in packages/"

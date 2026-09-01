@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+SCRIPT_DIR="$(cd -- "$(dirname -- "$0")" && pwd)"
+
 DISTRO="${1:-}"
 
 if [ -z "$DISTRO" ]; then
@@ -17,6 +19,17 @@ fi
 
 MISSING_PACKAGES=()
 VERIFIED_COUNT=0
+
+# nixpkgs is one big expression: resolve every attribute in a single evaluation
+# up front instead of re-evaluating it once per package inside the loop.
+NIX_AVAILABLE=""
+if [ "$DISTRO" = "nix" ]; then
+    NIX_AVAILABLE="$(mktemp)"
+    trap 'rm -f "$NIX_AVAILABLE"' EXIT
+    awk -F'\t' 'NR > 1 && NF >= 3 { print $3 }' "$TSV_FILE" \
+        | "$SCRIPT_DIR/nix-query.sh" \
+        | cut -d'=' -f1 > "$NIX_AVAILABLE"
+fi
 
 echo "verifying packages in $TSV_FILE for $DISTRO"
 
@@ -64,6 +77,11 @@ while IFS=$'\t' read -r col1 col2 col3 col4 || [ -n "$col1" ]; do
             ;;
         alpine)
             if apk info -e "$PACKAGE" >/dev/null 2>&1 || apk search -e "$PACKAGE" >/dev/null 2>&1; then
+                EXISTS=1
+            fi
+            ;;
+        nix)
+            if grep -qxF "$PACKAGE" "$NIX_AVAILABLE"; then
                 EXISTS=1
             fi
             ;;

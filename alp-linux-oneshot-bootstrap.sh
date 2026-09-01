@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-DEFAULT_PROFILE="alp-heavy"
+DEFAULT_PROFILE="alp-base"
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 UBUNTU_TSV="$SCRIPT_DIR/packages/ubuntu.tsv"
 DEBIAN_TSV="$SCRIPT_DIR/packages/debian.tsv"
@@ -10,9 +10,19 @@ FEDORA_TSV="$SCRIPT_DIR/packages/fedora.tsv"
 ARCH_TSV="$SCRIPT_DIR/packages/arch.tsv"
 RHEL_TSV="$SCRIPT_DIR/packages/rhel.tsv"
 ALPINE_TSV="$SCRIPT_DIR/packages/alpine.tsv"
+NIX_TSV="$SCRIPT_DIR/packages/nix.tsv"
+NIX_RELEASES_TSV="$SCRIPT_DIR/packages/meta/nix-releases.tsv"
 CHECK_SCRIPT="/tmp/check-alp-bootstrap-tools.sh"
-IMPLEMENTED_BACKENDS="ubuntu, debian, fedora, arch, rhel, alpine, macos"
+IMPLEMENTED_BACKENDS="ubuntu, debian, fedora, arch, rhel, alpine, nix, macos"
 PLANNED_BACKENDS="centos, suse"
+
+# Package groups as they appear in the first column of packages/*.tsv.
+# alp-base is the default; alp-heavy is every group; any single group name is
+# also a valid profile and is installed on top of alp-base.
+KNOWN_GROUPS=(core server terminal-ux dev-c rust go zig python containers networking security-lite debugging embedded-lite)
+BASE_GROUPS=(core server terminal-ux)
+SYNTHETIC_PROFILES="alp-base, alp-heavy"
+SELECTED_GROUPS=()
 
 DRY_RUN=0
 PROFILE="$DEFAULT_PROFILE"
@@ -41,7 +51,22 @@ SELECTED_RHEL_DNF_PACKAGES=()
 AVAILABLE_RHEL_DNF_PACKAGES=()
 SELECTED_APK_PACKAGES=()
 AVAILABLE_APK_PACKAGES=()
+SELECTED_NIX_ATTRS=()
+AVAILABLE_NIX_ATTRS=()
 SELECTED_COMMANDS=()
+
+NIX_RELEASE=""
+NIX_CODENAME=""
+NIX_CHANNEL=""
+NIX_RELEASE_STATUS=""
+NIX_CURRENT_RELEASE=""
+NIX_MIN_RELEASE=""
+NIX_MIN_CODENAME=""
+NIX_SUPPORTED_RELEASES=""
+NIX_RELEASE_IDS=()
+NIX_RELEASE_CODENAMES=()
+NIX_RELEASE_CHANNELS=()
+NIX_RELEASE_STATUSES=()
 
 log() {
   printf '[alp-bootstrap] %s\n' "$*"
@@ -72,13 +97,23 @@ Usage: ./alp-linux-oneshot-bootstrap.sh [options]
 
 Options:
   --dry-run          Print packages and actions without applying them.
-  --profile <name>  Select profile to install. Default: alp-heavy.
-  --no-java         Keep Java/JVM tooling excluded. Default.
-  --add-java        Reserved Java/JVM opt-in placeholder; does not install Java.
-  --with-java       Deprecated alias for --add-java; does not install Java.
-  --help            Show this help.
+  --profile <name>   Select profile to install. Default: alp-base.
+  --no-java          Keep Java/JVM tooling excluded. Default.
+  --add-java         Reserved Java/JVM opt-in placeholder; does not install Java.
+  --with-java        Deprecated alias for --add-java; does not install Java.
+  --help             Show this help.
 
-Implemented backends: ubuntu, debian, fedora, arch, rhel, alpine, macos.
+Profiles:
+  alp-base           core + server + terminal-ux. Default.
+  alp-heavy          Every package group.
+  <group>            Any single package group, installed on top of alp-base:
+                     core, server, terminal-ux, dev-c, rust, go, zig, python,
+                     containers, networking, security-lite, debugging,
+                     embedded-lite.
+
+The server group is skipped on macOS; the macOS package map does not define it.
+
+Implemented backends: ubuntu, debian, fedora, arch, rhel, alpine, nix, macos.
 Planned backends: centos, suse.
 USAGE
 }
@@ -126,6 +161,9 @@ select_backend() {
     alpine)
       BACKEND="alpine"
       ;;
+    nixos)
+      BACKEND="nix"
+      ;;
     opensuse*|sles)
       BACKEND="suse"
       ;;
@@ -145,7 +183,7 @@ select_backend() {
 }
 
 require_supported_backend() {
-  if [[ "$BACKEND" == "ubuntu" || "$BACKEND" == "debian" || "$BACKEND" == "fedora" || "$BACKEND" == "arch" || "$BACKEND" == "rhel" || "$BACKEND" == "alpine" || "$BACKEND" == "macos" ]]; then
+  if [[ "$BACKEND" == "ubuntu" || "$BACKEND" == "debian" || "$BACKEND" == "fedora" || "$BACKEND" == "arch" || "$BACKEND" == "rhel" || "$BACKEND" == "alpine" || "$BACKEND" == "nix" || "$BACKEND" == "macos" ]]; then
     return 0
   fi
 
@@ -193,56 +231,41 @@ parse_args() {
   done
 }
 
+resolve_profile_groups() {
+  local groups=() group
+
+  case "$PROFILE" in
+    alp-base)
+      groups=("${BASE_GROUPS[@]}")
+      ;;
+    alp-heavy)
+      groups=("${KNOWN_GROUPS[@]}")
+      ;;
+    *)
+      array_contains "$PROFILE" "${KNOWN_GROUPS[@]}" \
+        || die "unknown profile: $PROFILE; synthetic profiles: $SYNTHETIC_PROFILES; package groups: ${KNOWN_GROUPS[*]}"
+      groups=("${BASE_GROUPS[@]}" "$PROFILE")
+      ;;
+  esac
+
+  SELECTED_GROUPS=()
+
+  for group in "${groups[@]}"; do
+    # The macOS package map has no server group; skip it instead of failing.
+    if [[ "$BACKEND" == "macos" && "$group" == "server" ]]; then
+      continue
+    fi
+
+    if ((${#SELECTED_GROUPS[@]} == 0)) || ! array_contains "$group" "${SELECTED_GROUPS[@]}"; then
+      SELECTED_GROUPS+=("$group")
+    fi
+  done
+
+  ((${#SELECTED_GROUPS[@]} > 0)) || die "profile '$PROFILE' resolved to no package groups"
+}
+
 package_profile_selected() {
-  local package_profile="$1"
-
-  if [[ "$PROFILE" == "alp-heavy" && "$BACKEND" == "macos" ]]; then
-    case "$package_profile" in
-      core|terminal-ux|dev-c|rust|go|zig|python|containers|networking|security-lite|debugging|embedded-lite)
-        return 0
-        ;;
-      *)
-        return 1
-        ;;
-    esac
-  fi
-
-  if [[ "$PROFILE" == "alp-heavy" ]]; then
-    case "$package_profile" in
-      core|server|terminal-ux|dev-c|rust|go|zig|python|containers|networking|security-lite|debugging|embedded-lite)
-        return 0
-        ;;
-      *)
-        return 1
-        ;;
-    esac
-  fi
-
-  if [[ "$BACKEND" == "macos" ]]; then
-    case "$package_profile" in
-      core|terminal-ux)
-        return 0
-        ;;
-      "$PROFILE")
-        return 0
-        ;;
-      *)
-        return 1
-        ;;
-    esac
-  else
-    case "$package_profile" in
-      core|server|terminal-ux)
-        return 0
-        ;;
-      "$PROFILE")
-        return 0
-        ;;
-      *)
-        return 1
-        ;;
-    esac
-  fi
+  array_contains "$1" "${SELECTED_GROUPS[@]}"
 }
 
 array_contains() {
@@ -482,6 +505,138 @@ load_alpine_packages_from_tsv() {
   ((${#SELECTED_APK_PACKAGES[@]} > 0)) || die "no Alpine apk packages selected for profile: $PROFILE"
 }
 
+release_sort_key() {
+  local release="${1:-}"
+
+  if [[ "$release" =~ ^([0-9]{2})\.([0-9]{2})$ ]]; then
+    printf '%s%s' "${BASH_REMATCH[1]}" "${BASH_REMATCH[2]}"
+    return 0
+  fi
+
+  return 1
+}
+
+load_nix_release_table() {
+  local release codename channel status notes key min_key=""
+
+  [[ -r "$NIX_RELEASES_TSV" ]] || die "missing Nix release table: $NIX_RELEASES_TSV"
+
+  NIX_RELEASE_IDS=()
+  NIX_RELEASE_CODENAMES=()
+  NIX_RELEASE_CHANNELS=()
+  NIX_RELEASE_STATUSES=()
+  NIX_CURRENT_RELEASE=""
+  NIX_MIN_RELEASE=""
+  NIX_MIN_CODENAME=""
+
+  while IFS=$'\t' read -r release codename channel status notes; do
+    [[ -z "${release:-}" ]] && continue
+    [[ "$release" == "release" ]] && continue
+
+    NIX_RELEASE_IDS+=("$release")
+    NIX_RELEASE_CODENAMES+=("$codename")
+    NIX_RELEASE_CHANNELS+=("$channel")
+    NIX_RELEASE_STATUSES+=("$status")
+
+    if [[ "$status" == "current" ]]; then
+      NIX_CURRENT_RELEASE="$release"
+    fi
+
+    if key="$(release_sort_key "$release")"; then
+      if [[ -z "$min_key" ]] || ((10#$key < 10#$min_key)); then
+        min_key="$key"
+        NIX_MIN_RELEASE="$release"
+        NIX_MIN_CODENAME="$codename"
+      fi
+    fi
+  done < "$NIX_RELEASES_TSV"
+
+  ((${#NIX_RELEASE_IDS[@]} > 0)) || die "no releases defined in $NIX_RELEASES_TSV"
+  [[ -n "$NIX_CURRENT_RELEASE" ]] || die "no release marked 'current' in $NIX_RELEASES_TSV"
+
+  NIX_SUPPORTED_RELEASES="${NIX_RELEASE_IDS[*]}"
+}
+
+nix_release_lookup() {
+  local want="$1" index
+
+  for ((index = 0; index < ${#NIX_RELEASE_IDS[@]}; index++)); do
+    if [[ "${NIX_RELEASE_IDS[index]}" == "$want" ]]; then
+      NIX_RELEASE="${NIX_RELEASE_IDS[index]}"
+      NIX_CODENAME="${NIX_RELEASE_CODENAMES[index]}"
+      NIX_CHANNEL="${NIX_RELEASE_CHANNELS[index]}"
+      NIX_RELEASE_STATUS="${NIX_RELEASE_STATUSES[index]}"
+      return 0
+    fi
+  done
+
+  return 1
+}
+
+resolve_nix_release() {
+  local candidate key current_key
+
+  load_nix_release_table
+
+  # NixOS reports VERSION_ID as 26.05 on a release, or 26.05.<date>.<rev> when
+  # it follows a channel; the first two components are the release series.
+  candidate="$(printf '%s' "${OS_VERSION_ID:-}" | cut -d. -f1,2)"
+  [[ -n "$candidate" ]] || candidate="unknown"
+
+  if ! nix_release_lookup "$candidate"; then
+    key="$(release_sort_key "$candidate")" || key=""
+    current_key="$(release_sort_key "$NIX_CURRENT_RELEASE")" || current_key=""
+
+    if [[ -n "$key" && -n "$current_key" ]] && ((10#$key < 10#$current_key)); then
+      die "NixOS release '$candidate' is older than $NIX_MIN_RELEASE ($NIX_MIN_CODENAME), the oldest release this bootstrap accepts; supported releases: $NIX_SUPPORTED_RELEASES"
+    fi
+
+    warn "NixOS release '$candidate' is not listed in $NIX_RELEASES_TSV; treating it as the unstable channel"
+    nix_release_lookup "unstable" || die "no 'unstable' row in $NIX_RELEASES_TSV"
+  fi
+
+  case "$NIX_RELEASE_STATUS" in
+    legacy)
+      warn "NixOS $NIX_RELEASE ($NIX_CODENAME) is past upstream support; continuing best-effort"
+      ;;
+    rolling)
+      warn "tracking the $NIX_CHANNEL channel; nixpkgs attribute names can move without notice"
+      ;;
+  esac
+
+  log "nixpkgs target: $NIX_RELEASE ($NIX_CODENAME), channel $NIX_CHANNEL, status $NIX_RELEASE_STATUS"
+}
+
+load_nix_packages_from_tsv() {
+  local package_profile logical_name nix_package command notes
+
+  [[ -r "$NIX_TSV" ]] || die "missing Nix package map: $NIX_TSV"
+
+  SELECTED_NIX_ATTRS=()
+  SELECTED_COMMANDS=()
+
+  while IFS=$'\t' read -r package_profile logical_name nix_package command notes; do
+    [[ -z "${package_profile:-}" ]] && continue
+    [[ "$package_profile" == "profile" ]] && continue
+
+    if package_profile_selected "$package_profile"; then
+      if [[ -n "${nix_package:-}" ]]; then
+        if ((${#SELECTED_NIX_ATTRS[@]} == 0)) || ! array_contains "$nix_package" "${SELECTED_NIX_ATTRS[@]}"; then
+          SELECTED_NIX_ATTRS+=("$nix_package")
+        fi
+      fi
+
+      if command_is_checkable "${command:-}"; then
+        if ((${#SELECTED_COMMANDS[@]} == 0)) || ! array_contains "$command" "${SELECTED_COMMANDS[@]}"; then
+          SELECTED_COMMANDS+=("$command")
+        fi
+      fi
+    fi
+  done < "$NIX_TSV"
+
+  ((${#SELECTED_NIX_ATTRS[@]} > 0)) || die "no nixpkgs attributes selected for profile: $PROFILE"
+}
+
 load_package_map() {
   case "$BACKEND" in
     ubuntu)
@@ -504,6 +659,10 @@ load_package_map() {
       ;;
     alpine)
       load_alpine_packages_from_tsv
+      ;;
+    nix)
+      resolve_nix_release
+      load_nix_packages_from_tsv
       ;;
     suse|centos)
       die "backend '$BACKEND' is planned but not implemented in v0; implemented backends: $IMPLEMENTED_BACKENDS; planned backends: $PLANNED_BACKENDS"
@@ -824,6 +983,92 @@ install_alpine_packages() {
   run_privileged apk add "${AVAILABLE_APK_PACKAGES[@]}"
 }
 
+ensure_nix() {
+  command -v nix-env >/dev/null 2>&1 \
+    || die "nix-env is required for the nix backend, but nix-env was not found"
+  command -v nix-instantiate >/dev/null 2>&1 \
+    || die "nix-instantiate is required for the nix backend, but nix-instantiate was not found"
+}
+
+nix_attr_filter_expr() {
+  printf 'let\n'
+  printf '  pkgs = import <nixpkgs> { };\n'
+  printf '  lib = pkgs.lib;\n'
+  printf '  has = path:\n'
+  printf '    let probe = builtins.tryEval (lib.attrByPath (lib.splitString "." path) null pkgs);\n'
+  printf '    in probe.success && probe.value != null;\n'
+  printf '  wanted = [\n'
+  printf '    "%s"\n' "${SELECTED_NIX_ATTRS[@]}"
+  printf '  ];\n'
+  printf 'in builtins.concatStringsSep "\\n" (builtins.filter has wanted)\n'
+}
+
+filter_available_nix_attrs() {
+  local output attr
+
+  AVAILABLE_NIX_ATTRS=()
+
+  log "checking nixpkgs attribute availability"
+
+  # One evaluation resolves every attribute path, including dotted ones such as
+  # linuxPackages.perf; per-attribute queries would re-evaluate nixpkgs.
+  if ! output="$(nix-instantiate --eval --raw --expr "$(nix_attr_filter_expr)" 2>/dev/null)"; then
+    warn "could not evaluate <nixpkgs>; installing the selected attributes without pre-filtering"
+    AVAILABLE_NIX_ATTRS=("${SELECTED_NIX_ATTRS[@]}")
+    return 0
+  fi
+
+  while IFS= read -r attr; do
+    [[ -n "$attr" ]] && AVAILABLE_NIX_ATTRS+=("$attr")
+  done <<< "$output"
+
+  for attr in "${SELECTED_NIX_ATTRS[@]}"; do
+    if ((${#AVAILABLE_NIX_ATTRS[@]} == 0)) || ! array_contains "$attr" "${AVAILABLE_NIX_ATTRS[@]}"; then
+      warn "skipping nixpkgs attribute missing from $NIX_CHANNEL: $attr"
+    fi
+  done
+
+  ((${#AVAILABLE_NIX_ATTRS[@]} > 0)) || die "no available nixpkgs attributes remained for profile: $PROFILE"
+}
+
+install_nix_packages() {
+  local attr
+
+  log "selected profile: $PROFILE"
+  log "selected nixpkgs attributes: ${SELECTED_NIX_ATTRS[*]}"
+
+  if (( DRY_RUN )); then
+    log "dry-run: nix-channel --update"
+    log "dry-run: check <nixpkgs> attribute availability for selected attributes"
+    log "dry-run: nix-env -f <nixpkgs> -iA ${SELECTED_NIX_ATTRS[*]}"
+    return 0
+  fi
+
+  ensure_nix
+
+  if [[ "${EUID:-$(id -u)}" -eq 0 ]]; then
+    warn "running as root; nix-env installs into the root profile, not a user profile"
+  fi
+
+  nix-channel --update || warn "nix-channel --update failed; continuing with the current <nixpkgs>"
+
+  filter_available_nix_attrs
+  log "available nixpkgs attributes: ${AVAILABLE_NIX_ATTRS[*]}"
+
+  if nix-env -f '<nixpkgs>' -iA "${AVAILABLE_NIX_ATTRS[@]}"; then
+    return 0
+  fi
+
+  # A single file collision (coreutils vs util-linux, gcc vs clang) aborts the
+  # whole batch, so retry per attribute and report what did not apply.
+  warn "batch nix-env install failed; retrying one attribute at a time"
+
+  for attr in "${AVAILABLE_NIX_ATTRS[@]}"; do
+    nix-env -f '<nixpkgs>' -iA "$attr" \
+      || warn "skipping nixpkgs attribute that failed to install: $attr"
+  done
+}
+
 install_packages() {
   case "$BACKEND" in
     ubuntu)
@@ -846,6 +1091,9 @@ install_packages() {
       ;;
     alpine)
       install_alpine_packages
+      ;;
+    nix)
+      install_nix_packages
       ;;
     suse|centos)
       die "backend '$BACKEND' is planned but not implemented yet; implemented backends: $IMPLEMENTED_BACKENDS; planned backends: $PLANNED_BACKENDS"
@@ -1072,8 +1320,10 @@ main() {
   detect_os
   select_backend
   require_supported_backend
+  resolve_profile_groups
 
   log "detected: ${OS_NAME} ${OS_VERSION_ID} (${OS_ID}, ${OS_ARCH}); backend: $BACKEND"
+  log "profile: $PROFILE; package groups: ${SELECTED_GROUPS[*]}"
 
   if (( ADD_JAVA )); then
     if [[ "$JAVA_FLAG_SOURCE" == "--with-java" ]]; then
@@ -1112,6 +1362,10 @@ main() {
       setup_bash_qol
       ;;
     alpine)
+      setup_bashrc_loader
+      setup_bash_qol
+      ;;
+    nix)
       setup_bashrc_loader
       setup_bash_qol
       ;;

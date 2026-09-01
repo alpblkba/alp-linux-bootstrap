@@ -1,0 +1,6 @@
+release	codename	channel	status	notes
+unstable	Zokor	nixos-unstable	rolling	Rolling channel following nixpkgs master; attribute names may drift ahead of stable
+26.05	Yarara	nixos-26.05	current	Current stable release; the reference target for lock tracking
+25.11	Xantusia	nixos-25.11	supported	Previous stable release
+25.05	Warbler	nixos-25.05	legacy	Past upstream support; accepted best-effort with a warning
+24.11	Vicuna	nixos-24.11	legacy	Oldest release this bootstrap accepts; best-effort only
