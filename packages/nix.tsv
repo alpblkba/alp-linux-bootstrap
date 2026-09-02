@@ -65,7 +65,7 @@ containers	docker-compose	docker-compose	docker-compose	Docker Compose
 containers	podman	podman	podman	Rootless container engine
 containers	buildah	buildah	buildah	OCI image builder
 containers	skopeo	skopeo	skopeo	Container image copy/inspect
-networking	bind-tools	dnsutils	dig	DNS query tools
+networking	dns-client	ldns	drill	DNS query client. The obvious choice would be dnsutils for dig, but nixpkgs defines dnsutils as bind.dnsutils, a non-default output, and nix-env cannot carry an output-specified derivation in a profile without breaking every later operation on it (NixOS/nix#12707). ldns keeps drill in its default output, so it is safe here.
 networking	net-tools	net-tools	netstat	Legacy network tools
 networking	iproute2	iproute2	ip	Modern network tools
 networking	traceroute	traceroute	traceroute	Route tracing
@@ -83,7 +83,7 @@ security-lite	pass	pass	pass	Unix password manager
 security-lite	openssh	openssh	ssh	SSH client security baseline
 debugging	strace	strace	strace	System call tracer
 debugging	ltrace	ltrace	ltrace	Library call tracer
-debugging	perf	linuxPackages.perf	perf	Performance tooling; nixpkgs keeps perf inside the kernel package set
+debugging	perf	perf	perf	Performance tooling. Was linuxPackages.perf; nixpkgs promoted it to a top-level perf attribute and the old path now only survives as an alias that prints an evaluation warning.
 debugging	bpftrace	bpftrace	bpftrace	eBPF tracing
 debugging	sysstat	sysstat	iostat	System performance stats
 debugging	lsof	lsof	lsof	Open files/process inspection

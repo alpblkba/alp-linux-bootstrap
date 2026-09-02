@@ -53,7 +53,17 @@ SELECTED_APK_PACKAGES=()
 AVAILABLE_APK_PACKAGES=()
 SELECTED_NIX_ATTRS=()
 AVAILABLE_NIX_ATTRS=()
+# Attributes that resolve but must not go into a nix-env profile, and attributes
+# the channel does not have at all. Kept apart from AVAILABLE_NIX_ATTRS so the
+# reason a package is absent survives into the summary.
+UNSAFE_NIX_ATTRS=()
+MISSING_NIX_ATTRS=()
 SELECTED_COMMANDS=()
+
+# Every package that was selected but did not end up on the system, with the
+# reason. The script used to warn about these and still exit 0, which reported a
+# half-finished install as a success and hid it from CI.
+INSTALL_FAILURES=()
 
 NIX_RELEASE=""
 NIX_CODENAME=""
@@ -990,23 +1000,45 @@ ensure_nix() {
     || die "nix-instantiate is required for the nix backend, but nix-instantiate was not found"
 }
 
+# Emits one "<status> <attribute>" line per selected attribute, where status is
+# ok, outputspec or missing.
+#
+# outputspec is the interesting one. Some nixpkgs attributes point at a
+# non-default output of another package rather than at a package of their own:
+# dnsutils is literally bind.dnsutils, and dig is the same derivation with one
+# meta attribute added. Installing such an attribute with nix-env writes a
+# manifest entry whose meta.outputsToInstall names an output the derivation no
+# longer advertises once it is re-realized, and from that point on every nix-env
+# operation on the profile fails with "this derivation has bad
+# 'meta.outputsToInstall'". The message names whatever was being installed at the
+# time rather than the entry that poisoned the profile, so from a log it looks
+# like an unrelated package broke. See https://github.com/NixOS/nix/issues/12707.
+#
+# The damage outlasts the run: the profile stays unusable until the offending
+# entry is removed by hand, so a second run of this script on the same machine
+# would fail at its first install. Detecting the shape up front is the only way
+# to keep the backend idempotent.
 nix_attr_filter_expr() {
   printf 'let\n'
   printf '  pkgs = import <nixpkgs> { };\n'
   printf '  lib = pkgs.lib;\n'
-  printf '  has = path:\n'
-  printf '    let probe = builtins.tryEval (lib.attrByPath (lib.splitString "." path) null pkgs);\n'
-  printf '    in probe.success && probe.value != null;\n'
+  printf '  probe = path:\n'
+  printf '    let resolved = builtins.tryEval (lib.attrByPath (lib.splitString "." path) null pkgs);\n'
+  printf '    in if !resolved.success || resolved.value == null then "missing"\n'
+  printf '       else let spec = builtins.tryEval (resolved.value.outputSpecified or false);\n'
+  printf '            in if spec.success && spec.value then "outputspec" else "ok";\n'
   printf '  wanted = [\n'
   printf '    "%s"\n' "${SELECTED_NIX_ATTRS[@]}"
   printf '  ];\n'
-  printf 'in builtins.concatStringsSep "\\n" (builtins.filter has wanted)\n'
+  printf 'in builtins.concatStringsSep "\\n" (map (path: probe path + " " + path) wanted)\n'
 }
 
 filter_available_nix_attrs() {
-  local output attr
+  local output status attr
 
   AVAILABLE_NIX_ATTRS=()
+  UNSAFE_NIX_ATTRS=()
+  MISSING_NIX_ATTRS=()
 
   log "checking nixpkgs attribute availability"
 
@@ -1018,17 +1050,69 @@ filter_available_nix_attrs() {
     return 0
   fi
 
-  while IFS= read -r attr; do
-    [[ -n "$attr" ]] && AVAILABLE_NIX_ATTRS+=("$attr")
+  while read -r status attr; do
+    [[ -n "$attr" ]] || continue
+    case "$status" in
+      ok) AVAILABLE_NIX_ATTRS+=("$attr") ;;
+      outputspec) UNSAFE_NIX_ATTRS+=("$attr") ;;
+      *) MISSING_NIX_ATTRS+=("$attr") ;;
+    esac
   done <<< "$output"
 
-  for attr in "${SELECTED_NIX_ATTRS[@]}"; do
-    if ((${#AVAILABLE_NIX_ATTRS[@]} == 0)) || ! array_contains "$attr" "${AVAILABLE_NIX_ATTRS[@]}"; then
-      warn "skipping nixpkgs attribute missing from $NIX_CHANNEL: $attr"
-    fi
+  for attr in ${MISSING_NIX_ATTRS[@]+"${MISSING_NIX_ATTRS[@]}"}; do
+    warn "skipping nixpkgs attribute missing from $NIX_CHANNEL: $attr"
+    INSTALL_FAILURES+=("$attr (not present in $NIX_CHANNEL)")
+  done
+
+  for attr in ${UNSAFE_NIX_ATTRS[@]+"${UNSAFE_NIX_ATTRS[@]}"}; do
+    warn "refusing to install '$attr': it names a non-default output of another package"
+    warn "  nix-env would corrupt this profile and break every later run; see NixOS/nix#12707"
+    warn "  reach it with 'nix shell nixpkgs#$attr' or 'nix profile install nixpkgs#$attr' instead"
+    INSTALL_FAILURES+=("$attr (output-specified, unsafe for nix-env)")
   done
 
   ((${#AVAILABLE_NIX_ATTRS[@]} > 0)) || die "no available nixpkgs attributes remained for profile: $PROFILE"
+}
+
+# Installs one attribute, retrying once at a lower profile priority when the
+# failure is a file collision rather than a real build error.
+#
+# Wrappers in nixpkgs legitimately ship overlapping files: gcc-wrapper,
+# binutils-wrapper and clang-wrapper all provide bin/ld.gold, and gdb and
+# gcc-arm-embedded both provide share/gdb/python/gdb/styling.py. nix-env cannot
+# point one profile path at two store paths, so it abandons the whole generation
+# and the package is lost even though everything else in it would have been
+# useful. A priority breaks the tie. The number is a precedence where lower wins
+# and the default is 5, so installing the loser at 10 keeps the first package's
+# copy of the shared file and still brings in every binary that does not clash.
+#
+# Output is captured rather than streamed, since the collision has to be read
+# back out of it. By the time this runs the batch attempt has already pulled
+# every path into the store, so there is little progress left to watch.
+nix_install_one_attr() {
+  local attr="$1"
+  local output
+
+  if output="$(nix-env -f '<nixpkgs>' -iA "$attr" 2>&1)"; then
+    printf '%s\n' "$output"
+    return 0
+  fi
+  printf '%s\n' "$output"
+
+  if [[ "$output" != *"conflict for the following files"* ]]; then
+    return 1
+  fi
+
+  warn "file collision installing '$attr'; retrying it at a lower profile priority"
+
+  if output="$(nix-env -f '<nixpkgs>' -iA "$attr" --priority 10 2>&1)"; then
+    printf '%s\n' "$output"
+    log "installed '$attr' at priority 10; the shared files stay owned by the package installed before it"
+    return 0
+  fi
+  printf '%s\n' "$output"
+
+  return 1
 }
 
 install_nix_packages() {
@@ -1064,8 +1148,11 @@ install_nix_packages() {
   warn "batch nix-env install failed; retrying one attribute at a time"
 
   for attr in "${AVAILABLE_NIX_ATTRS[@]}"; do
-    nix-env -f '<nixpkgs>' -iA "$attr" \
-      || warn "skipping nixpkgs attribute that failed to install: $attr"
+    if nix_install_one_attr "$attr"; then
+      continue
+    fi
+    warn "skipping nixpkgs attribute that failed to install: $attr"
+    INSTALL_FAILURES+=("$attr (nix-env install failed)")
   done
 }
 
@@ -1377,6 +1464,16 @@ main() {
   esac
 
   write_check_script
+
+  if ((${#INSTALL_FAILURES[@]} > 0)); then
+    local entry
+    warn "finished, but ${#INSTALL_FAILURES[@]} selected package(s) were not installed:"
+    for entry in "${INSTALL_FAILURES[@]}"; do
+      warn "  $entry"
+    done
+    warn "run check script with: $CHECK_SCRIPT"
+    return 2
+  fi
 
   log "done"
   log "run check script with: $CHECK_SCRIPT"
