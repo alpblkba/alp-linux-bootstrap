@@ -1,5 +1,5 @@
 ca-certificates=2026.2.90_v9.0.317-1.fc44
-curl=8.18.0-9.fc44
+curl=8.18.0-10.fc44
 wget=unknown
 git=Fast-1.fc44
 gnupg2=2.4.9-16.fc44
@@ -43,7 +43,7 @@ clang=22.1.8-4.fc44
 clang-tools-extra=22.1.8-4.fc44
 valgrind=3.27.1-1.fc44
 rustup=1.29.0-7.fc44
-cargo=1.98.0-1.fc44
+cargo=1.98.1-1.fc44
 rustc=unknown
 golang=1.26.8-2.fc44
 zig=0.16.0-1.fc44
