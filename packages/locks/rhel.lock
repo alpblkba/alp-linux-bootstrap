@@ -1,5 +1,5 @@
 ca-certificates=2025.2.80_v9.0.305-91.el9
-curl=7.76.1-40.el9_8.7
+curl=7.76.1-40.el9_8.8
 wget=1.21.1-11.el9_8
 git=Fast-1.el9
 gnupg2=2.3.3-5.el9_7
