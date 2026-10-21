@@ -1,4 +1,4 @@
-ca-certificates=20250419~deb12u1
+ca-certificates=20250419~deb12u2
 curl=7.88.1-10+deb12u15
 wget=1.21.3-1+deb12u1
 git=1:2.39.5-0+deb12u3

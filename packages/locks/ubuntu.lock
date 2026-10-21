@@ -1,4 +1,4 @@
-ca-certificates=20260601~24.04.1
+ca-certificates=20260816ubuntu0.24.04.1
 curl=8.5.0-2ubuntu10.16
 wget=1.21.4-1ubuntu4.5
 git=1:2.43.0-1ubuntu7.4
@@ -13,7 +13,7 @@ tar=1.35+dfsg-3ubuntu0.4
 rsync=3.2.7-1ubuntu1.5
 openssh-client=1:9.6p1-3ubuntu13.20
 htop=3.3.0-4build1
-tmux=3.4-1ubuntu0.1
+tmux=3.4-1ubuntu0.2
 tree=2.1.1-2ubuntu3.24.04.2
 jq=1.7.1-3ubuntu0.24.04.2
 yq=3.1.0-3
